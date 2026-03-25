@@ -8,7 +8,9 @@ services:
     autoDeploy: true
     healthCheckPath: /health
     envVars:
-      - key: AIzaSyDyUQokHyUmfa9Ni-PZr7VvKanZdY-1hOw
+      - key: PYTHON_VERSION
+        value: 3.11.11
+      - key: GOOGLE_MAPS_API_KEY
         sync: false
       - key: OPENAI_API_KEY
         sync: false
