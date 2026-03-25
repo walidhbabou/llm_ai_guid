@@ -43,6 +43,34 @@ pip install -r requirements.txt
 uvicorn app.main:app --reload
 ```
 
+## Deploiement sur Render
+
+Ce repo contient deja `render.yaml` pour un deploiement automatique.
+
+1. Pousser le code sur GitHub.
+2. Sur Render: New + Blueprint.
+3. Selectionner le repository.
+4. Valider le service detecte dans `render.yaml`.
+5. Ajouter les secrets obligatoires dans Render:
+  - `GOOGLE_MAPS_API_KEY`
+  - `OPENAI_API_KEY` (optionnel si vous acceptez le fallback heuristique)
+
+Render va:
+- installer `requirements.txt`
+- lancer `uvicorn app.main:app --host 0.0.0.0 --port $PORT`
+- verifier la sante sur `/health`
+
+Variables disponibles dans `.env.example`:
+- `OPENAI_MODEL`
+- `GOOGLE_SEARCH_RADIUS_METERS`
+- `GOOGLE_NEAR_ME_RADIUS_METERS`
+- `GOOGLE_LANGUAGE`
+- `GOOGLE_REGION`
+
+Notes:
+- Si la carte n'apparait pas sur `/ui`, verifier que `GOOGLE_MAPS_API_KEY` est bien defini.
+- Si vous voyez une erreur 500 au boot, verifier les logs Render et les variables d'environnement.
+
 ## Endpoint principal
 
 - `POST /api/ai/search`

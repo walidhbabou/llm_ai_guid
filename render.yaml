@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: llm-map-api
+    env: python
+    plan: free
+    buildCommand: pip install -r requirements.txt
+    startCommand: uvicorn app.main:app --host 0.0.0.0 --port $PORT
+    autoDeploy: true
+    healthCheckPath: /health
+    envVars:
+      - key: AIzaSyDyUQokHyUmfa9Ni-PZr7VvKanZdY-1hOw
+        sync: false
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4o-mini
+      - key: GOOGLE_SEARCH_RADIUS_METERS
+        value: "5000"
+      - key: GOOGLE_NEAR_ME_RADIUS_METERS
+        value: "2500"
+      - key: GOOGLE_LANGUAGE
+        value: fr
+      - key: GOOGLE_REGION
+        value: ma
