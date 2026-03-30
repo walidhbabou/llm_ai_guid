@@ -3,8 +3,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 class Settings(BaseSettings):
     google_maps_api_key: str = ""
-    openai_api_key: str = ""
-    openai_model: str = "gpt-4o-mini"
+    groq_api_key: str = ""
+    groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
     google_search_radius_meters: int = 5000
     google_near_me_radius_meters: int = 2500
     google_language: str = "fr"

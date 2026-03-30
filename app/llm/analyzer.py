@@ -2,10 +2,9 @@ import json
 import re
 from typing import Any
 
-from openai import OpenAI
+from groq import Groq
 
 from app.core.config import settings
-from app.core.exceptions import LLMAnalysisError
 from app.dto.search_dto import QueryAnalysisDTO
 from app.llm.system_prompt import SYSTEM_PROMPT
 
@@ -24,11 +23,23 @@ _LOCATION_STOPWORDS = {
     "svp",
     "stp",
 }
+_NON_SEARCH_PATTERNS = [
+    r"\bquelle\s+est\b",
+    r"\bwho\s+is\b",
+    r"\bwhat\s+is\b",
+    r"\bcapitale\b",
+    r"\bmeteo\b",
+    r"\bm[ée]t[ée]o\b",
+    r"\btraduis\b",
+    r"\btraduire\b",
+    r"\bcalcule\b",
+    r"\bcombien\s+font\b",
+]
 
 
 class LLMQueryAnalyzer:
     def __init__(self) -> None:
-        self._client = OpenAI(api_key=settings.openai_api_key) if settings.openai_api_key else None
+        self._client = Groq(api_key=settings.groq_api_key) if settings.groq_api_key else None
 
     def analyze(self, query: str) -> QueryAnalysisDTO:
         if self._client is None:
@@ -41,8 +52,9 @@ class LLMQueryAnalyzer:
 
         try:
             completion = self._client.chat.completions.create(
-                model=settings.openai_model,
+                model=settings.groq_model,
                 temperature=0,
+                max_completion_tokens=512,
                 response_format={"type": "json_object"},
                 messages=[
                     {"role": "system", "content": SYSTEM_PROMPT},
@@ -50,7 +62,7 @@ class LLMQueryAnalyzer:
                 ],
             )
         except Exception as exc:
-            # Keep the API usable even when OpenAI credentials are missing/invalid.
+            # Keep the API usable even when Groq credentials are missing/invalid.
             return self._fallback_analysis(query)
 
         content = completion.choices[0].message.content or "{}"
@@ -78,6 +90,8 @@ class LLMQueryAnalyzer:
             return None
 
     def _normalize_analysis(self, data: dict[str, Any], original_query: str) -> QueryAnalysisDTO:
+        heuristic = self._fallback_analysis(original_query)
+
         category = data.get("category")
         if isinstance(category, str):
             category = category.strip().lower()
@@ -89,22 +103,37 @@ class LLMQueryAnalyzer:
         preferences = data.get("preferences")
         if not isinstance(preferences, list):
             preferences = []
-        preferences = [str(item).strip() for item in preferences if str(item).strip()]
+        preferences = [str(item).strip().lower() for item in preferences if str(item).strip()]
+        # Preserve order while removing duplicates.
+        preferences = list(dict.fromkeys(preferences))
 
         result_limit = data.get("result_limit", 10)
+        if isinstance(result_limit, str) and result_limit.isdigit():
+            result_limit = int(result_limit)
         if not isinstance(result_limit, int):
             result_limit = 10
         result_limit = max(1, min(result_limit, 20))
 
         city = data.get("city")
         if city is not None:
-            city = str(city).strip() or None
+            city = str(city).strip().lower() or None
 
         intent = data.get("intent")
-        if not isinstance(intent, str) or not intent.strip():
-            intent = "search_places"
+        if isinstance(intent, str):
+            intent = intent.strip().lower()
+        if intent not in {"search_places", "other"}:
+            intent = heuristic.intent
 
-        near_me = bool(data.get("near_me", False))
+        near_me_raw = data.get("near_me", False)
+        if isinstance(near_me_raw, bool):
+            near_me = near_me_raw
+        elif isinstance(near_me_raw, str):
+            near_me = near_me_raw.strip().lower() in {"true", "1", "yes", "oui"}
+        else:
+            near_me = bool(near_me_raw)
+
+        if near_me is False and heuristic.near_me is True:
+            near_me = True
 
         normalized = QueryAnalysisDTO(
             intent=intent,
@@ -116,18 +145,19 @@ class LLMQueryAnalyzer:
         )
 
         # Lightweight safety net when model misses obvious cues.
-        heuristic = self._fallback_analysis(original_query)
         if normalized.category is None and heuristic.category is not None:
             normalized.category = heuristic.category
         if normalized.city is None and heuristic.city is not None:
             normalized.city = heuristic.city
-        if normalized.near_me is False and heuristic.near_me is True:
-            normalized.near_me = True
+        if not normalized.preferences and heuristic.preferences:
+            normalized.preferences = heuristic.preferences
 
         return normalized
 
     def _fallback_analysis(self, query: str) -> QueryAnalysisDTO:
         q = query.lower()
+
+        intent = self._infer_intent(query)
 
         category = None
         category_map = {
@@ -178,13 +208,50 @@ class LLMQueryAnalyzer:
                 preferences.append(pref)
 
         return QueryAnalysisDTO(
-            intent="search_places",
+            intent=intent,
             city=city,
             category=category,
             preferences=preferences,
             result_limit=result_limit,
             near_me=near_me,
         )
+
+    def _infer_intent(self, query: str) -> str:
+        q = query.lower().strip()
+
+        has_search_verb = any(
+            verb in q
+            for verb in [
+                "cherche",
+                "recherche",
+                "trouve",
+                "donne moi",
+                "propose",
+                "recommend",
+                "find",
+            ]
+        )
+
+        mentions_place_category = any(cat in q for cat in _ALLOWED_CATEGORIES)
+        mentions_near_me = any(
+            term in q
+            for term in [
+                "pres de moi",
+                "près de moi",
+                "autour de moi",
+                "near me",
+                "ma position",
+                "ma localisation",
+            ]
+        )
+
+        if has_search_verb or mentions_place_category or mentions_near_me:
+            return "search_places"
+
+        if any(re.search(pattern, q) for pattern in _NON_SEARCH_PATTERNS):
+            return "other"
+
+        return "search_places"
 
     def _extract_city_candidate(self, query: str) -> str | None:
         location_patterns = [

@@ -34,8 +34,8 @@ pip install -r requirements.txt
 
 3. Copier `.env.example` en `.env` et renseigner:
 - `GOOGLE_MAPS_API_KEY`
-- `OPENAI_API_KEY` (optionnel, fallback heuristique si absent)
-- `OPENAI_MODEL`
+- `GROQ_API_KEY` (optionnel, fallback heuristique si absent)
+- `GROQ_MODEL`
 
 ## Lancer le serveur
 
@@ -53,7 +53,7 @@ Ce repo contient deja `render.yaml` pour un deploiement automatique.
 4. Valider le service detecte dans `render.yaml`.
 5. Ajouter les secrets obligatoires dans Render:
   - `GOOGLE_MAPS_API_KEY`
-  - `OPENAI_API_KEY` (optionnel si vous acceptez le fallback heuristique)
+  - `GROQ_API_KEY` (optionnel si vous acceptez le fallback heuristique)
 
 Render va:
 - installer `requirements.txt`
@@ -61,7 +61,7 @@ Render va:
 - verifier la sante sur `/health`
 
 Variables disponibles dans `.env.example`:
-- `OPENAI_MODEL`
+- `GROQ_MODEL`
 - `GOOGLE_SEARCH_RADIUS_METERS`
 - `GOOGLE_NEAR_ME_RADIUS_METERS`
 - `GOOGLE_LANGUAGE`
