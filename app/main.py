@@ -6,7 +6,7 @@ from app.api.routes.test_ui import router as test_ui_router
 from app.core.exceptions import AppError
 from app.dto.search_dto import ApiErrorResponseDTO
 
-app = FastAPI(title="AI Tourist Guide Backend", version="1.0.0")
+app = FastAPI(title="AI Tourist Guide Backend", version="1.1.0")
 
 
 @app.exception_handler(AppError)
@@ -45,7 +45,7 @@ async def favicon() -> dict:
 async def list_endpoints() -> dict:
     return {
         "service": "AI Tourist Guide Backend",
-        "version": "1.0.0",
+        "version": "1.1.0",
         "base_path": "/",
         "endpoints": [
             {
@@ -57,7 +57,7 @@ async def list_endpoints() -> dict:
             {
                 "method": "POST",
                 "path": "/api/ai/search",
-                "description": "Recherche de lieux par requete utilisateur",
+                "description": "Recherche de lieux ou reponse guide selon la requete utilisateur",
                 "request_body": {
                     "query": "cafes pres de moi",
                     "user_latitude": 33.5731,
@@ -65,9 +65,20 @@ async def list_endpoints() -> dict:
                 },
             },
             {
+                "method": "POST",
+                "path": "/api/ai/search/audio",
+                "description": "Requete audio envoyee en multipart/form-data, transcrite puis traitee par l'assistant",
+                "request_body": {
+                    "audio": "@/tmp/question.webm",
+                    "language": "fr",
+                    "user_latitude": 33.5731,
+                    "user_longitude": -7.5898,
+                },
+            },
+            {
                 "method": "GET",
                 "path": "/ui",
-                "description": "Interface web de test",
+                "description": "Interface web de test avec saisie texte/audio et lecture audio de la reponse",
                 "request_body": None,
             },
             {

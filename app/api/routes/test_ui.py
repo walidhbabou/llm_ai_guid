@@ -23,7 +23,7 @@ async def api_test_ui() -> str:
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>AI Tourist API Tester</title>
+  <title>Assistant Touristique Texte + Audio</title>
   <style>
     :root {
       --bg: #f5f2ea;
@@ -88,7 +88,7 @@ async def api_test_ui() -> str:
       color: var(--muted);
     }
 
-    input, textarea {
+    input, textarea, select {
       width: 100%;
       border: 1px solid var(--line);
       border-radius: 12px;
@@ -106,7 +106,7 @@ async def api_test_ui() -> str:
       line-height: 1.35;
     }
 
-    input:focus, textarea:focus {
+    input:focus, textarea:focus, select:focus {
       border-color: var(--accent);
       box-shadow: 0 0 0 4px rgba(0, 95, 115, 0.12);
     }
@@ -122,6 +122,41 @@ async def api_test_ui() -> str:
       gap: 10px;
       margin-top: 4px;
       flex-wrap: wrap;
+    }
+
+    .audio-panel {
+      margin-top: 14px;
+      padding: 14px;
+      border-radius: 14px;
+      border: 1px solid #d6e4e8;
+      background: linear-gradient(180deg, #f6fbfc 0%, #fff 100%);
+    }
+
+    .toggle {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+    }
+
+    .toggle input {
+      width: auto;
+      margin: 0;
+    }
+
+    .voice-note {
+      margin: 10px 0 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.45;
+    }
+
+    .audio-separator {
+      margin: 14px 0 10px;
+      border: 0;
+      border-top: 1px dashed #c8d9de;
     }
 
     button {
@@ -142,6 +177,11 @@ async def api_test_ui() -> str:
       background: #ebf5f7;
       color: var(--accent);
       border: 1px solid #c8e1e8;
+    }
+
+    .recording {
+      background: var(--error);
+      color: #fff;
     }
 
     button:hover { opacity: 0.95; }
@@ -177,9 +217,50 @@ async def api_test_ui() -> str:
 
     .summary {
       display: grid;
-      grid-template-columns: repeat(4, minmax(0, 1fr));
+      grid-template-columns: repeat(5, minmax(0, 1fr));
       gap: 10px;
       margin-bottom: 14px;
+    }
+
+    .assistant-card {
+      background: linear-gradient(135deg, #fff7ec 0%, #fff 100%);
+      border: 1px solid var(--line);
+      border-radius: 14px;
+      padding: 14px;
+      margin-bottom: 14px;
+    }
+
+    .assistant-card small {
+      display: block;
+      color: var(--muted);
+      margin-bottom: 6px;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+    }
+
+    .assistant-card p {
+      margin: 0;
+      line-height: 1.5;
+      color: #2f2a1f;
+      font-size: 14px;
+    }
+
+    .suggestions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 12px;
+    }
+
+    .suggestion-chip {
+      border: 1px solid #d8c9aa;
+      background: #fffdf8;
+      color: #6d5532;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
     }
 
     .metric {
@@ -299,8 +380,8 @@ async def api_test_ui() -> str:
 <body>
   <main class="container">
     <section class="panel">
-      <h1 class="title">Testeur API IA</h1>
-      <p class="subtitle">Envoie une requete vers <code>/api/ai/search</code> et verifie l'analyse IA ainsi que les lieux Google Maps.</p>
+      <h1 class="title">Assistant Touristique</h1>
+      <p class="subtitle">L'utilisateur peut poser sa question en texte, avec sa voix ou en envoyant un fichier audio, puis lire la reponse a l'ecran ou l'ecouter en audio.</p>
 
       <label for="query">Requete utilisateur</label>
       <textarea id="query">Donne-moi les meilleurs cafes pres de moi</textarea>
@@ -322,6 +403,40 @@ async def api_test_ui() -> str:
         <button class="secondary" id="btn-clear" type="button">Vider</button>
       </div>
 
+      <section class="audio-panel">
+        <label for="voice-lang">Langue du micro et de la lecture audio</label>
+        <select id="voice-lang">
+          <option value="fr-FR" selected>Francais</option>
+          <option value="ar-MA">Arabe</option>
+          <option value="en-US">Anglais</option>
+        </select>
+
+        <div class="actions">
+          <button class="secondary" id="btn-voice-input" type="button">Parler</button>
+          <button class="secondary" id="btn-play-reply" type="button" disabled>Lire la reponse</button>
+          <button class="secondary" id="btn-stop-reply" type="button" disabled>Couper l'audio</button>
+        </div>
+
+        <hr class="audio-separator" />
+
+        <label for="audio-file">Envoyer un vrai fichier audio au backend</label>
+        <input id="audio-file" type="file" accept=".flac,.m4a,.mp3,.mp4,.mpeg,.mpga,.ogg,.wav,.webm,audio/*" />
+
+        <div class="actions">
+          <button class="secondary" id="btn-send-audio" type="button" disabled>Envoyer l'audio au backend</button>
+          <button class="secondary" id="btn-record-audio" type="button">Enregistrer puis envoyer</button>
+        </div>
+
+        <p class="voice-note" id="audio-upload-note">Aucun fichier audio selectionne.</p>
+
+        <label class="toggle" for="auto-speak">
+          <input id="auto-speak" type="checkbox" checked />
+          Lire automatiquement la reponse de l'assistant
+        </label>
+
+        <p class="voice-note" id="voice-support-note">Verification des capacites audio du navigateur...</p>
+      </section>
+
       <div id="status" class="status"></div>
     </section>
 
@@ -333,10 +448,17 @@ async def api_test_ui() -> str:
 
       <div class="summary" id="summary">
         <div class="metric"><small>Intent</small><strong id="intent">-</strong></div>
+        <div class="metric"><small>Langue</small><strong id="language">-</strong></div>
         <div class="metric"><small>Ville</small><strong id="city">-</strong></div>
         <div class="metric"><small>Categorie</small><strong id="category">-</strong></div>
         <div class="metric"><small>Near Me</small><strong id="nearMe">-</strong></div>
       </div>
+
+      <section class="assistant-card">
+        <small>Reponse assistant</small>
+        <p id="assistant-reply">Aucune reponse guide pour le moment.</p>
+        <div class="suggestions" id="suggestions"></div>
+      </section>
 
       <div class="cards" id="cards"></div>
 
@@ -359,20 +481,53 @@ async def api_test_ui() -> str:
     const btnSend = document.getElementById("btn-send");
     const btnLocate = document.getElementById("btn-locate");
     const btnClear = document.getElementById("btn-clear");
+    const btnVoiceInput = document.getElementById("btn-voice-input");
+    const btnSendAudio = document.getElementById("btn-send-audio");
+    const btnRecordAudio = document.getElementById("btn-record-audio");
+    const btnPlayReply = document.getElementById("btn-play-reply");
+    const btnStopReply = document.getElementById("btn-stop-reply");
+    const voiceLangSelect = document.getElementById("voice-lang");
+    const audioFileInput = document.getElementById("audio-file");
+    const autoSpeakCheckbox = document.getElementById("auto-speak");
+    const audioUploadNoteEl = document.getElementById("audio-upload-note");
+    const voiceSupportNoteEl = document.getElementById("voice-support-note");
     const statusEl = document.getElementById("status");
+    const apiBadgeEl = document.getElementById("api-badge");
 
     const intentEl = document.getElementById("intent");
+    const languageEl = document.getElementById("language");
     const cityEl = document.getElementById("city");
     const categoryEl = document.getElementById("category");
     const nearMeEl = document.getElementById("nearMe");
+    const assistantReplyEl = document.getElementById("assistant-reply");
+    const suggestionsEl = document.getElementById("suggestions");
     const cardsEl = document.getElementById("cards");
     const jsonOutputEl = document.getElementById("json-output");
     const mapNoteEl = document.getElementById("map-note");
 
-    let map = null;
+    const SpeechRecognitionApi = window.SpeechRecognition || window.webkitSpeechRecognition;
+    const recognitionSupported = Boolean(SpeechRecognitionApi);
+    const speechSupported =
+      "speechSynthesis" in window && "SpeechSynthesisUtterance" in window;
+    const mediaRecorderSupported = Boolean(
+      window.MediaRecorder &&
+      navigator.mediaDevices &&
+      typeof navigator.mediaDevices.getUserMedia === "function"
+    );
 
+    let map = null;
     let resultMarkers = [];
     let userMarker = null;
+    let recognition = null;
+    let isListening = false;
+    let voiceSessionPrefix = "";
+    let lastAssistantText = "";
+    let mediaRecorder = null;
+    let mediaRecorderStream = null;
+    let recordedAudioChunks = [];
+    let isRecordingUploadAudio = false;
+    let isUploadingAudio = false;
+    let discardRecordedAudioOnStop = false;
 
     function initGoogleMap() {
       if (!googleMapsKey || !window.google || !window.google.maps) {
@@ -395,6 +550,225 @@ async def api_test_ui() -> str:
       statusEl.textContent = message;
     }
 
+    function normalizeVoiceLang(lang) {
+      const value = String(lang || "").toLowerCase();
+      if (value.startsWith("fr")) return "fr-FR";
+      if (value.startsWith("ar")) return "ar-MA";
+      if (value.startsWith("en")) return "en-US";
+      return voiceLangSelect.value || "fr-FR";
+    }
+
+    function normalizeBackendAudioLanguage(lang) {
+      const value = String(lang || "").toLowerCase();
+      if (value.startsWith("fr")) return "fr";
+      if (value.startsWith("ar")) return "ar";
+      if (value.startsWith("en")) return "en";
+      return "";
+    }
+
+    function pickVoice(lang) {
+      if (!speechSupported) {
+        return null;
+      }
+
+      const voices = window.speechSynthesis.getVoices();
+      if (!voices.length) {
+        return null;
+      }
+
+      const exactMatch = voices.find(
+        (voice) => String(voice.lang || "").toLowerCase() === lang.toLowerCase()
+      );
+      if (exactMatch) {
+        return exactMatch;
+      }
+
+      const prefix = lang.split("-")[0].toLowerCase();
+      return (
+        voices.find((voice) =>
+          String(voice.lang || "").toLowerCase().startsWith(prefix)
+        ) || null
+      );
+    }
+
+    function updateVoiceInputButton() {
+      btnVoiceInput.textContent = isListening ? "Arreter l'ecoute" : "Parler";
+      btnVoiceInput.classList.toggle("recording", isListening);
+      btnVoiceInput.classList.toggle("primary", isListening);
+      btnVoiceInput.classList.toggle("secondary", !isListening);
+      btnVoiceInput.disabled = !recognitionSupported;
+    }
+
+    function updateReplyAudioButtons() {
+      btnPlayReply.disabled = !speechSupported || !lastAssistantText;
+      btnStopReply.disabled = !speechSupported;
+    }
+
+    function updateAudioUploadButtons() {
+      const hasSelectedFile = Boolean(audioFileInput.files && audioFileInput.files.length);
+      btnSendAudio.disabled = isUploadingAudio || !hasSelectedFile;
+      btnRecordAudio.disabled = isUploadingAudio || (!mediaRecorderSupported && !isRecordingUploadAudio);
+      btnRecordAudio.textContent = isRecordingUploadAudio
+        ? "Arreter puis envoyer"
+        : "Enregistrer puis envoyer";
+      btnRecordAudio.classList.toggle("recording", isRecordingUploadAudio);
+      btnRecordAudio.classList.toggle("primary", isRecordingUploadAudio);
+      btnRecordAudio.classList.toggle("secondary", !isRecordingUploadAudio);
+    }
+
+    function updateVoiceSupportNote() {
+      const inputState = recognitionSupported
+        ? "Saisie vocale disponible sur ce navigateur."
+        : "Saisie vocale indisponible ici. Utilisez le texte ou testez Chrome/Edge.";
+      const outputState = speechSupported
+        ? "Lecture audio disponible."
+        : "Lecture audio indisponible sur ce navigateur.";
+      const uploadState = mediaRecorderSupported
+        ? "Envoi audio vers le backend disponible."
+        : "Envoi micro vers le backend indisponible sur ce navigateur.";
+      voiceSupportNoteEl.textContent = `${inputState} ${outputState} ${uploadState}`;
+    }
+
+    function stopSpeaking() {
+      if (!speechSupported) {
+        return;
+      }
+
+      window.speechSynthesis.cancel();
+      updateReplyAudioButtons();
+    }
+
+    function speakText(text, detectedLanguage = null) {
+      if (!speechSupported) {
+        setStatus("La lecture audio n'est pas supportee par ce navigateur.", "error");
+        return;
+      }
+
+      const cleanText = String(text || "").trim();
+      if (!cleanText) {
+        setStatus("Aucun texte disponible pour la lecture audio.", "error");
+        return;
+      }
+
+      stopSpeaking();
+
+      const utterance = new SpeechSynthesisUtterance(cleanText);
+      utterance.lang = normalizeVoiceLang(detectedLanguage);
+      const selectedVoice = pickVoice(utterance.lang);
+      if (selectedVoice) {
+        utterance.voice = selectedVoice;
+      }
+
+      utterance.rate = 1;
+      utterance.pitch = 1;
+      utterance.onstart = () => {
+        setStatus("Lecture audio en cours...", "");
+        updateReplyAudioButtons();
+      };
+      utterance.onend = () => {
+        setStatus("Lecture audio terminee.", "ok");
+        updateReplyAudioButtons();
+      };
+      utterance.onerror = () => {
+        setStatus("La lecture audio a ete interrompue.", "error");
+        updateReplyAudioButtons();
+      };
+
+      window.speechSynthesis.speak(utterance);
+      updateReplyAudioButtons();
+    }
+
+    function buildRecognition() {
+      if (!recognitionSupported || recognition) {
+        return recognition;
+      }
+
+      recognition = new SpeechRecognitionApi();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = voiceLangSelect.value || "fr-FR";
+
+      recognition.onstart = () => {
+        isListening = true;
+        updateVoiceInputButton();
+        setStatus("Micro actif. Parlez maintenant...", "");
+      };
+
+      recognition.onresult = (event) => {
+        const finalChunks = [];
+        let interimChunk = "";
+
+        for (let index = 0; index < event.results.length; index += 1) {
+          const transcript = event.results[index][0]?.transcript ?? "";
+          if (event.results[index].isFinal) {
+            finalChunks.push(transcript);
+          } else {
+            interimChunk += `${transcript} `;
+          }
+        }
+
+        const mergedText = [voiceSessionPrefix, finalChunks.join(" "), interimChunk]
+          .map((value) => String(value || "").trim())
+          .filter(Boolean)
+          .join(" ")
+          .replace(/\\s+/g, " ")
+          .trim();
+
+        queryInput.value = mergedText;
+      };
+
+      recognition.onerror = (event) => {
+        const errorCode = event?.error || "unknown";
+        if (errorCode === "aborted") {
+          return;
+        }
+
+        if (errorCode === "not-allowed") {
+          setStatus("Micro refuse. Autorisez l'acces au microphone dans votre navigateur.", "error");
+          return;
+        }
+
+        setStatus(`Erreur micro: ${errorCode}`, "error");
+      };
+
+      recognition.onend = () => {
+        isListening = false;
+        updateVoiceInputButton();
+        if (queryInput.value.trim()) {
+          setStatus("Transcription terminee. Vous pouvez envoyer la requete.", "ok");
+        }
+      };
+
+      return recognition;
+    }
+
+    function toggleVoiceInput() {
+      if (!recognitionSupported) {
+        setStatus("La saisie vocale n'est pas supportee sur ce navigateur.", "error");
+        return;
+      }
+
+      const recognizer = buildRecognition();
+      if (!recognizer) {
+        setStatus("Impossible d'initialiser la saisie vocale.", "error");
+        return;
+      }
+
+      if (isListening) {
+        recognizer.stop();
+        return;
+      }
+
+      voiceSessionPrefix = queryInput.value.trim();
+      recognizer.lang = voiceLangSelect.value || "fr-FR";
+
+      try {
+        recognizer.start();
+      } catch {
+        setStatus("Le micro est deja en cours d'utilisation. Patientez un instant.", "error");
+      }
+    }
+
     function toFixedSafe(value) {
       if (typeof value !== "number") return "-";
       return value.toFixed(5);
@@ -402,9 +776,35 @@ async def api_test_ui() -> str:
 
     function renderSummary(data) {
       intentEl.textContent = data.intent ?? "-";
+      languageEl.textContent = data.detected_language ?? "-";
       cityEl.textContent = data.city ?? "-";
       categoryEl.textContent = data.category ?? "-";
       nearMeEl.textContent = data.near_me ? "true" : "false";
+    }
+
+    function renderAssistantReply(data) {
+      const replyText =
+        data.assistant_reply ?? data.message ?? "Aucune reponse guide disponible.";
+      assistantReplyEl.textContent = replyText;
+      lastAssistantText =
+        replyText === "Aucune reponse guide disponible." ? "" : replyText;
+      updateReplyAudioButtons();
+    }
+
+    function renderSuggestedQuestions(data) {
+      suggestionsEl.innerHTML = "";
+      const suggestions = Array.isArray(data.suggested_questions) ? data.suggested_questions : [];
+      for (const suggestion of suggestions) {
+        const button = document.createElement("button");
+        button.type = "button";
+        button.className = "suggestion-chip";
+        button.textContent = suggestion;
+        button.addEventListener("click", () => {
+          queryInput.value = suggestion;
+          queryInput.focus();
+        });
+        suggestionsEl.appendChild(button);
+      }
     }
 
     function clearMapMarkers() {
@@ -531,12 +931,233 @@ async def api_test_ui() -> str:
       }
     }
 
+    async function parseApiResponse(response) {
+      const rawText = await response.text();
+      let data = {};
+      try {
+        data = rawText ? JSON.parse(rawText) : {};
+      } catch {
+        data = { error: { message: `Reponse non JSON: ${rawText.slice(0, 250)}` } };
+      }
+      return data;
+    }
+
+    function renderApiError(data) {
+      setStatus(data?.error?.message || "Erreur API", "error");
+      jsonOutputEl.textContent = JSON.stringify(data, null, 2);
+      renderAssistantReply({});
+      renderSuggestedQuestions({});
+      cardsEl.innerHTML = "";
+      renderMap([]);
+    }
+
+    function renderApiSuccess(data) {
+      renderSummary(data);
+      renderAssistantReply(data);
+      renderSuggestedQuestions(data);
+      renderPlaces(data.results);
+      renderMap(data.results);
+      jsonOutputEl.textContent = JSON.stringify(data, null, 2);
+
+      if (data.transcribed_query) {
+        queryInput.value = data.transcribed_query;
+        audioUploadNoteEl.textContent = `Transcription: ${data.transcribed_query}`;
+      }
+
+      if (autoSpeakCheckbox.checked && lastAssistantText) {
+        speakText(lastAssistantText, data.detected_language);
+      }
+    }
+
+    function buildSuccessMessage(data, source = "text") {
+      if (source === "audio") {
+        if ((data.results_count ?? 0) > 0) {
+          return `Audio transcrit puis traite: ${data.results_count ?? 0} lieu(x) trouve(s).`;
+        }
+        return "Audio transcrit puis reponse guide generee.";
+      }
+
+      if ((data.results_count ?? 0) > 0) {
+        return `Succes: ${data.results_count ?? 0} lieu(x) trouve(s).`;
+      }
+      return "Reponse guide generee sans resultat cartographique.";
+    }
+
+    function getPreferredRecordingMimeType() {
+      if (!mediaRecorderSupported) {
+        return "";
+      }
+
+      if (MediaRecorder.isTypeSupported("audio/webm;codecs=opus")) {
+        return "audio/webm;codecs=opus";
+      }
+      if (MediaRecorder.isTypeSupported("audio/webm")) {
+        return "audio/webm";
+      }
+      if (MediaRecorder.isTypeSupported("audio/ogg;codecs=opus")) {
+        return "audio/ogg;codecs=opus";
+      }
+      return "";
+    }
+
+    async function sendAudioBlob(blob, filename) {
+      if (!blob || blob.size === 0) {
+        setStatus("Le fichier audio est vide ou invalide.", "error");
+        return;
+      }
+
+      if (isListening && recognition) {
+        recognition.stop();
+      }
+      stopSpeaking();
+
+      isUploadingAudio = true;
+      btnSend.disabled = true;
+      apiBadgeEl.textContent = "POST /api/ai/search/audio";
+      updateAudioUploadButtons();
+      setStatus("Envoi de l'audio au backend...", "");
+
+      try {
+        const payload = new FormData();
+        payload.append("audio", blob, filename);
+
+        const lat = latInput.value.trim();
+        const lng = lngInput.value.trim();
+        const language = normalizeBackendAudioLanguage(voiceLangSelect.value);
+
+        if (lat && lng) {
+          payload.append("user_latitude", lat);
+          payload.append("user_longitude", lng);
+        }
+        if (language) {
+          payload.append("language", language);
+        }
+
+        const response = await fetch("/api/ai/search/audio", {
+          method: "POST",
+          body: payload,
+        });
+
+        const data = await parseApiResponse(response);
+        if (!response.ok) {
+          renderApiError(data);
+          return;
+        }
+
+        renderApiSuccess(data);
+        setStatus(buildSuccessMessage(data, "audio"), "ok");
+      } catch (err) {
+        setStatus(`Erreur reseau: ${err.message}`, "error");
+      } finally {
+        isUploadingAudio = false;
+        btnSend.disabled = false;
+        updateAudioUploadButtons();
+      }
+    }
+
+    async function sendSelectedAudioFile() {
+      const file = audioFileInput.files && audioFileInput.files[0];
+      if (!file) {
+        setStatus("Choisissez un fichier audio avant l'envoi.", "error");
+        return;
+      }
+
+      audioUploadNoteEl.textContent = `Fichier pret: ${file.name}`;
+      await sendAudioBlob(file, file.name || `question-${Date.now()}.webm`);
+    }
+
+    async function toggleAudioRecording() {
+      if (isRecordingUploadAudio && mediaRecorder) {
+        mediaRecorder.stop();
+        return;
+      }
+
+      if (!mediaRecorderSupported) {
+        setStatus("L'enregistrement audio n'est pas supporte ici.", "error");
+        return;
+      }
+
+      if (isListening && recognition) {
+        recognition.stop();
+      }
+
+      try {
+        mediaRecorderStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        recordedAudioChunks = [];
+        const mimeType = getPreferredRecordingMimeType();
+        mediaRecorder = mimeType
+          ? new MediaRecorder(mediaRecorderStream, { mimeType })
+          : new MediaRecorder(mediaRecorderStream);
+
+        mediaRecorder.ondataavailable = (event) => {
+          if (event.data && event.data.size > 0) {
+            recordedAudioChunks.push(event.data);
+          }
+        };
+
+        mediaRecorder.onerror = () => {
+          setStatus("Erreur pendant l'enregistrement audio.", "error");
+        };
+
+        mediaRecorder.onstop = async () => {
+          isRecordingUploadAudio = false;
+          updateAudioUploadButtons();
+
+          if (mediaRecorderStream) {
+            for (const track of mediaRecorderStream.getTracks()) {
+              track.stop();
+            }
+            mediaRecorderStream = null;
+          }
+
+          if (discardRecordedAudioOnStop) {
+            discardRecordedAudioOnStop = false;
+            recordedAudioChunks = [];
+            audioUploadNoteEl.textContent = "Enregistrement annule.";
+            return;
+          }
+
+          const recordedType = mediaRecorder?.mimeType || mimeType || "audio/webm";
+          const blob = new Blob(recordedAudioChunks, { type: recordedType });
+          recordedAudioChunks = [];
+
+          if (!blob.size) {
+            setStatus("Aucun son detecte pendant l'enregistrement.", "error");
+            return;
+          }
+
+          audioUploadNoteEl.textContent = "Enregistrement termine. Envoi en cours...";
+          const extension = recordedType.includes("ogg") ? "ogg" : "webm";
+          await sendAudioBlob(blob, `question-${Date.now()}.${extension}`);
+        };
+
+        mediaRecorder.start();
+        isRecordingUploadAudio = true;
+        updateAudioUploadButtons();
+        audioUploadNoteEl.textContent = "Enregistrement en cours...";
+        setStatus("Enregistrement audio en cours. Cliquez encore pour arreter et envoyer.", "");
+      } catch (err) {
+        setStatus(`Impossible d'acceder au micro: ${err.message}`, "error");
+        if (mediaRecorderStream) {
+          for (const track of mediaRecorderStream.getTracks()) {
+            track.stop();
+          }
+          mediaRecorderStream = null;
+        }
+      }
+    }
+
     async function sendRequest() {
       const query = queryInput.value.trim();
       if (!query) {
         setStatus("La requete est obligatoire.", "error");
         return;
       }
+
+      if (isListening && recognition) {
+        recognition.stop();
+      }
+      stopSpeaking();
 
       const payload = { query };
       const lat = latInput.value.trim();
@@ -548,6 +1169,7 @@ async def api_test_ui() -> str:
       }
 
       btnSend.disabled = true;
+      apiBadgeEl.textContent = "POST /api/ai/search";
       setStatus("Appel en cours...", "");
 
       try {
@@ -559,27 +1181,15 @@ async def api_test_ui() -> str:
           body: JSON.stringify(payload),
         });
 
-        const rawText = await response.text();
-        let data = {};
-        try {
-          data = rawText ? JSON.parse(rawText) : {};
-        } catch {
-          data = { error: { message: `Reponse non JSON: ${rawText.slice(0, 250)}` } };
-        }
+        const data = await parseApiResponse(response);
 
         if (!response.ok) {
-          setStatus(data?.error?.message || "Erreur API", "error");
-          jsonOutputEl.textContent = JSON.stringify(data, null, 2);
-          cardsEl.innerHTML = "";
-          renderMap([]);
+          renderApiError(data);
           return;
         }
 
-        renderSummary(data);
-        renderPlaces(data.results);
-        renderMap(data.results);
-        jsonOutputEl.textContent = JSON.stringify(data, null, 2);
-        setStatus(`Succes: ${data.results_count ?? 0} lieu(x) trouve(s).`, "ok");
+        renderApiSuccess(data);
+        setStatus(buildSuccessMessage(data, "text"), "ok");
       } catch (err) {
         setStatus(`Erreur reseau: ${err.message}`, "error");
       } finally {
@@ -644,6 +1254,27 @@ async def api_test_ui() -> str:
 
     btnSend.addEventListener("click", sendRequest);
     btnLocate.addEventListener("click", useMyLocation);
+    btnVoiceInput.addEventListener("click", toggleVoiceInput);
+    btnSendAudio.addEventListener("click", sendSelectedAudioFile);
+    btnRecordAudio.addEventListener("click", toggleAudioRecording);
+    btnPlayReply.addEventListener("click", () => {
+      speakText(lastAssistantText, languageEl.textContent);
+    });
+    btnStopReply.addEventListener("click", stopSpeaking);
+
+    audioFileInput.addEventListener("change", () => {
+      const file = audioFileInput.files && audioFileInput.files[0];
+      audioUploadNoteEl.textContent = file
+        ? `Fichier selectionne: ${file.name}`
+        : "Aucun fichier audio selectionne.";
+      updateAudioUploadButtons();
+    });
+
+    voiceLangSelect.addEventListener("change", () => {
+      if (recognition) {
+        recognition.lang = voiceLangSelect.value || "fr-FR";
+      }
+    });
 
     queryInput.addEventListener("keydown", (event) => {
       if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
@@ -660,9 +1291,18 @@ async def api_test_ui() -> str:
     });
 
     btnClear.addEventListener("click", () => {
+      if (isListening && recognition) {
+        recognition.stop();
+      }
+      if (isRecordingUploadAudio && mediaRecorder) {
+        discardRecordedAudioOnStop = true;
+        mediaRecorder.stop();
+      }
+      stopSpeaking();
       queryInput.value = "";
       latInput.value = "";
       lngInput.value = "";
+      audioFileInput.value = "";
       cardsEl.innerHTML = "";
       clearMapMarkers();
       if (userMarker) {
@@ -675,14 +1315,30 @@ async def api_test_ui() -> str:
       }
       mapNoteEl.textContent = "Carte reinitialisee.";
       jsonOutputEl.textContent = "Aucune reponse pour le moment.";
-      renderSummary({ intent: "-", city: "-", category: "-", near_me: false });
+      assistantReplyEl.textContent = "Aucune reponse guide pour le moment.";
+      lastAssistantText = "";
+      updateReplyAudioButtons();
+      audioUploadNoteEl.textContent = "Aucun fichier audio selectionne.";
+      apiBadgeEl.textContent = "POST /api/ai/search";
+      updateAudioUploadButtons();
+      suggestionsEl.innerHTML = "";
+      renderSummary({ intent: "-", detected_language: "-", city: "-", category: "-", near_me: false });
       setStatus("", "");
     });
+
+    updateVoiceSupportNote();
+    updateVoiceInputButton();
+    updateReplyAudioButtons();
+    updateAudioUploadButtons();
+
+    if (speechSupported && "onvoiceschanged" in window.speechSynthesis) {
+      window.speechSynthesis.onvoiceschanged = updateVoiceSupportNote;
+    }
 
     if (!googleMapsKey) {
       setStatus("GOOGLE_MAPS_API_KEY manquante: carte Google desactivee.", "error");
     } else {
-      setStatus("Interface chargee. Autorisez la localisation, puis lancez le test.", "");
+      setStatus("Interface chargee. Vous pouvez ecrire, parler, puis ecouter la reponse.", "");
     }
 
     useMyLocation();

@@ -15,6 +15,11 @@ class GoogleMapsError(AppError):
         super().__init__(message=message, code="google_maps_error")
 
 
+class AudioTranscriptionError(AppError):
+    def __init__(self, message: str = "Impossible de transcrire l'audio utilisateur") -> None:
+        super().__init__(message=message, code="audio_transcription_error")
+
+
 class ValidationError(AppError):
     def __init__(self, message: str = "Requete invalide") -> None:
         super().__init__(message=message, code="validation_error")

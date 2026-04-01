@@ -3,7 +3,9 @@
 Backend modulaire en FastAPI qui:
 - analyse une requete utilisateur avec un LLM,
 - appelle Google Maps Places + Geocoding,
-- retourne un JSON propre et standardise.
+- retourne un JSON propre et standardise,
+- peut aussi generer une reponse guide dans `assistant_reply`,
+- propose une interface `/ui` ou l'utilisateur peut poser sa question en texte ou en audio et ecouter la reponse.
 
 ## Architecture
 
@@ -14,6 +16,7 @@ app/
   services/search_service.py      # Orchestration du flux
   services/response_formatter.py
   llm/analyzer.py                 # Analyse requete (LLM + fallback)
+  llm/assistant.py                # Reponse guide conversationnelle
   llm/system_prompt.py            # Prompt systeme
   clients/google_maps_client.py   # Appels Google APIs
   dto/search_dto.py               # Request/Response DTOs
@@ -36,6 +39,7 @@ pip install -r requirements.txt
 - `GOOGLE_MAPS_API_KEY`
 - `GROQ_API_KEY` (optionnel, fallback heuristique si absent)
 - `GROQ_MODEL`
+- `GROQ_SPEECH_MODEL` (pour la transcription audio backend, optionnel)
 
 ## Lancer le serveur
 
@@ -74,7 +78,32 @@ Notes:
 ## Endpoint principal
 
 - `POST /api/ai/search`
+- `POST /api/ai/search/audio`
 - Interface de test web: `GET /ui`
+
+## Mode audio dans l'interface `/ui`
+
+L'endpoint backend reste en JSON texte, mais l'interface web ajoute deux fonctions cote navigateur:
+- question par texte ou saisie vocale avec le micro,
+- reponse affichee en texte et lecture audio optionnelle,
+- envoi d'un vrai fichier audio au backend via `multipart/form-data`.
+
+Details utiles:
+- la saisie vocale repose sur l'API Web Speech du navigateur,
+- la lecture audio repose sur `speechSynthesis`,
+- l'endpoint audio backend utilise Groq Speech-to-Text,
+- pour le meilleur support micro, utilisez de preference Chrome ou Edge,
+- si le navigateur ne supporte pas l'audio, l'interface continue de fonctionner en mode texte.
+
+Exemple d'appel backend audio:
+
+```bash
+curl -X POST http://127.0.0.1:8000/api/ai/search/audio \
+  -F "audio=@question.webm" \
+  -F "language=fr" \
+  -F "user_latitude=33.5731" \
+  -F "user_longitude=-7.5898"
+```
 
 Exemple body:
 
@@ -105,6 +134,7 @@ Avec geolocalisation (utile pour "proches de moi"):
   "result_limit": 10,
   "near_me": false,
   "results_count": 2,
+  "assistant_reply": "J'ai trouve 2 cafes a Rabat. Les premiers choix sont Cafe Exemple et Cafe Medina.",
   "results": [
     {
       "name": "Cafe Exemple",
@@ -134,7 +164,8 @@ Le prompt est dans `app/llm/system_prompt.py` et force un JSON structure avec:
 
 ## Notes techniques
 
-- Le LLM n'invente pas de lieux: il sert uniquement a parser la requete.
+- Le LLM n'invente pas de lieux: il sert a parser la requete et a rediger `assistant_reply`.
+- Le backend peut aussi repondre a certaines questions generales de guide touristique via `assistant_reply`.
 - Les lieux proviennent exclusivement de Google Maps API.
 - Si aucune ville n'est detectee et des coordonnees utilisateur sont fournies, le backend tente une deduction via reverse geocoding.
 - Les erreurs Google/LLM sont retournees en JSON propre.

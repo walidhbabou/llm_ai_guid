@@ -3,6 +3,8 @@ from app.dto.search_dto import PlaceDTO
 
 
 def _label_from_types(types: list[str]) -> str:
+    if "mosque" in types:
+        return "Mosquee"
     if "cafe" in types:
         return "Cafe"
     if "restaurant" in types:

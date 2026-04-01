@@ -57,6 +57,7 @@ class GoogleMapsClient:
         *,
         raw_query: str,
         category: str | None,
+        preferences: list[str] | None,
         city: str | None,
         limit: int,
         near_me: bool,
@@ -66,6 +67,7 @@ class GoogleMapsClient:
         if near_me and user_latitude is not None and user_longitude is not None:
             return await self._nearby_search(
                 category=category,
+                preferences=preferences,
                 latitude=user_latitude,
                 longitude=user_longitude,
                 limit=limit,
@@ -79,6 +81,7 @@ class GoogleMapsClient:
             if coords:
                 return await self._nearby_search(
                     category=category,
+                    preferences=preferences,
                     latitude=coords[0],
                     longitude=coords[1],
                     limit=limit,
@@ -90,6 +93,7 @@ class GoogleMapsClient:
         return await self._text_search(
             raw_query=raw_query,
             category=category,
+            preferences=preferences,
             city=city,
             limit=limit,
         )
@@ -98,6 +102,7 @@ class GoogleMapsClient:
         self,
         *,
         category: str | None,
+        preferences: list[str] | None,
         latitude: float,
         longitude: float,
         limit: int,
@@ -105,7 +110,11 @@ class GoogleMapsClient:
         query_hint: str | None,
         max_distance_meters: int | None,
     ) -> list[dict[str, Any]]:
-        keyword = (category or query_hint or "tourist attractions").strip()
+        keyword = self._build_keyword(
+            category=category,
+            preferences=preferences,
+            query_hint=query_hint,
+        )
         params = {
             "key": settings.google_maps_api_key,
             "location": f"{latitude},{longitude}",
@@ -156,11 +165,16 @@ class GoogleMapsClient:
         *,
         raw_query: str,
         category: str | None,
+        preferences: list[str] | None,
         city: str | None,
         limit: int,
     ) -> list[dict[str, Any]]:
-        base = category if category else "lieux touristiques"
-        text_query = f"{base} {city}".strip() if city else raw_query
+        text_query = self._build_text_query(
+            raw_query=raw_query,
+            category=category,
+            preferences=preferences,
+            city=city,
+        )
         params = {
             "query": text_query,
             "key": settings.google_maps_api_key,
@@ -175,6 +189,52 @@ class GoogleMapsClient:
             "https://maps.googleapis.com/maps/api/place/photo"
             f"?maxwidth={max_width}&photo_reference={photo_reference}&key={settings.google_maps_api_key}"
         )
+
+    def _build_keyword(
+        self,
+        *,
+        category: str | None,
+        preferences: list[str] | None,
+        query_hint: str | None,
+    ) -> str:
+        parts: list[str] = []
+        if category:
+            parts.append(self._category_to_keyword(category))
+        if preferences:
+            parts.extend(preferences[:3])
+        if not parts and query_hint:
+            return query_hint.strip()
+        if not parts:
+            return "tourist attractions"
+        return " ".join(parts).strip()
+
+    def _build_text_query(
+        self,
+        *,
+        raw_query: str,
+        category: str | None,
+        preferences: list[str] | None,
+        city: str | None,
+    ) -> str:
+        if not city:
+            return raw_query
+
+        parts: list[str] = []
+        if category:
+            parts.append(self._category_to_keyword(category))
+        if preferences:
+            parts.extend(preferences[:3])
+        if not parts:
+            parts.append(raw_query)
+
+        parts.append(city)
+        return " ".join(part.strip() for part in parts if part and part.strip())
+
+    def _category_to_keyword(self, category: str) -> str:
+        category_keywords = {
+            "mosquee": "mosque",
+        }
+        return category_keywords.get(category, category)
 
     async def _get(self, url: str, *, params: dict[str, Any]) -> dict[str, Any]:
         async with httpx.AsyncClient(timeout=20.0) as client:

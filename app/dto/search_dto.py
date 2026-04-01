@@ -11,6 +11,7 @@ class UserSearchRequestDTO(BaseModel):
 
 class QueryAnalysisDTO(BaseModel):
     intent: str = "search_places"
+    detected_language: str = "fr"
     city: str | None = None
     category: str | None = None
     preferences: list[str] = Field(default_factory=list)
@@ -33,6 +34,7 @@ class PlaceDTO(BaseModel):
 
 class SearchResponseDTO(BaseModel):
     intent: str
+    detected_language: str = "fr"
     city: str | None = None
     category: str | None = None
     preferences: list[str] = Field(default_factory=list)
@@ -40,7 +42,15 @@ class SearchResponseDTO(BaseModel):
     near_me: bool
     results_count: int
     results: list[PlaceDTO]
+    assistant_reply: str | None = None
+    suggested_questions: list[str] = Field(default_factory=list)
     message: str | None = None
+
+
+class AudioSearchResponseDTO(SearchResponseDTO):
+    input_mode: str = "audio"
+    transcribed_query: str
+    audio_filename: str | None = None
 
 
 class ApiErrorResponseDTO(BaseModel):
