@@ -54,9 +54,16 @@ class AISearchService:
                 user_latitude=user_latitude,
                 user_longitude=user_longitude,
             )
-            mapped_places = [map_google_place_to_dto(place, google_maps) for place in raw_places]
+            mapped_places = [
+                map_google_place_to_dto(
+                    place,
+                    google_maps,
+                    language=analysis.detected_language,
+                )
+                for place in raw_places
+            ]
 
-        assistant_reply, suggested_questions = self.assistant.build_response(
+        assistant_reply, suggested_questions, guide_cards = self.assistant.build_response(
             query=query,
             analysis=analysis,
             places=mapped_places,
@@ -67,6 +74,7 @@ class AISearchService:
             mapped_places,
             assistant_reply=assistant_reply,
             suggested_questions=suggested_questions,
+            guide_cards=guide_cards,
         )
 
     async def search_from_audio(

@@ -24,6 +24,8 @@ Regles:
 Intentions possibles:
 - "search_places": l'utilisateur veut trouver, chercher, recommander, comparer ou filtrer des lieux.
 - "other": question generale, conversationnelle ou hors recherche de lieu.
+- Si l'utilisateur demande plutot une ville, une destination ou un conseil global de voyage
+  (ex: "quelle ville culturelle pour des photos"), utilise "other".
 
 Categories autorisees:
 - restaurant
@@ -40,6 +42,8 @@ Retourne une liste concise de criteres utiles comme:
 - pas cher, luxe, calme, familial, romantique
 - wifi, terrasse, ouvert tard, travail
 - vue mer, vue montagne, vue medina
+- coucher de soleil, vue panoramique, photos, instagrammable
+- culturel, historique, artistique, balade
 - brunch, jus, smoothie, snack
 - marocain, italien, vegetarien, halal, seafood
 - jardin, parking, piscine, climatise

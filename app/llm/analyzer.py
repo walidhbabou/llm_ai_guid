@@ -45,8 +45,12 @@ _CITY_BREAK_TOKENS = {
     "cafe",
     "cafes",
     "calme",
+    "coucher",
+    "culturel",
+    "culturelle",
     "familial",
     "hotel",
+    "historique",
     "jam",
     "jam3",
     "manger",
@@ -55,9 +59,13 @@ _CITY_BREAK_TOKENS = {
     "parc",
     "pas",
     "plage",
+    "photo",
+    "photos",
     "restaurant",
     "resto",
     "romantique",
+    "soleil",
+    "ville",
     "wifi",
 }
 _NEAR_ME_TERMS = (
@@ -112,8 +120,48 @@ _PLACE_QUESTION_TERMS = (
     "what to visit",
     "best place",
     "best places",
+    "lieu romantique",
+    "endroit romantique",
+    "spot photo",
+    "point de vue",
+    "sunset spot",
+    "photo spot",
     "donde comer",
     "dove mangiare",
+)
+_CITY_RECOMMENDATION_TERMS = (
+    "quelle ville",
+    "quelle destination",
+    "ville pour",
+    "ville ideale",
+    "ville culturelle",
+    "ville romantique",
+    "ville photogenique",
+    "ville pour photos",
+    "city for",
+    "best city",
+    "which city",
+    "which destination",
+    "destination for",
+)
+_DESTINATION_STYLE_TERMS = (
+    "culture",
+    "culturel",
+    "culturelle",
+    "historique",
+    "heritage",
+    "photo",
+    "photos",
+    "photogenique",
+    "instagram",
+    "instagrammable",
+    "romantique",
+    "romantic",
+    "coucher de soleil",
+    "sunset",
+    "street photo",
+    "architecture",
+    "art",
 )
 _GENERAL_QUESTION_PATTERNS = (
     r"\bquelle est\b",
@@ -283,6 +331,12 @@ _PREFERENCE_TERMS = {
     "calme": ("calme", "quiet", "tranquille", "saktiya"),
     "familial": ("familial", "famille", "family", "kids", "drari", "wlad"),
     "romantique": ("romantique", "romantic", "couple", "amour"),
+    "coucher de soleil": ("coucher de soleil", "sunset", "golden hour"),
+    "photos": ("photo", "photos", "photogenique", "instagram", "instagrammable", "shooting"),
+    "culture": ("culture", "culturel", "culturelle", "artistique", "art", "patrimoine"),
+    "historique": ("historique", "heritage", "patrimoine", "ancienne medina", "architecture"),
+    "vue panoramique": ("vue panoramique", "panorama", "panoramique", "point de vue", "viewpoint"),
+    "balade": ("balade", "promenade", "walk", "stroll", "corniche"),
     "wifi": ("wifi", "wi fi", "internet"),
     "terrasse": ("terrasse", "rooftop", "outside", "exterieur"),
     "ouvert tard": ("ouvert tard", "late night", "ouvert 24h", "24h", "24 7"),
@@ -298,7 +352,7 @@ _PREFERENCE_TERMS = {
 
 class LLMQueryAnalyzer:
     def __init__(self) -> None:
-        self._client = Groq(api_key=settings.groq_api_key) if settings.groq_api_key else None
+        self._client = Groq(api_key=settings.llm_api_key) if settings.llm_api_key else None
 
     def analyze(self, query: str) -> QueryAnalysisDTO:
         if self._client is None:
@@ -421,6 +475,9 @@ class LLMQueryAnalyzer:
             ):
                 normalized.intent = "search_places"
 
+        if self._matches_city_recommendation_request(self._normalize_text(original_query)):
+            normalized.intent = "other"
+
         if heuristic.category is not None and normalized.category != heuristic.category:
             normalized.category = heuristic.category
         if normalized.city is None and heuristic.city is not None:
@@ -446,6 +503,9 @@ class LLMQueryAnalyzer:
         )
 
     def _infer_intent(self, normalized_query: str) -> str:
+        if self._matches_city_recommendation_request(normalized_query):
+            return "other"
+
         has_search_verb = any(self._contains_term(normalized_query, term) for term in _SEARCH_VERBS)
         mentions_category = self._extract_category(normalized_query) is not None
         mentions_near_me = self._is_near_me(normalized_query)
@@ -460,6 +520,27 @@ class LLMQueryAnalyzer:
             return "other"
 
         return "search_places"
+
+    def _matches_city_recommendation_request(self, normalized_query: str) -> bool:
+        mentions_city_request = any(
+            self._contains_term(normalized_query, term) for term in _CITY_RECOMMENDATION_TERMS
+        )
+        mentions_city_word = self._contains_term(normalized_query, "ville") or self._contains_term(
+            normalized_query, "city"
+        )
+        mentions_style = any(
+            self._contains_term(normalized_query, term) for term in _DESTINATION_STYLE_TERMS
+        )
+        mentions_place_search = (
+            self._extract_category(normalized_query) is not None
+            or self._is_near_me(normalized_query)
+            or any(self._contains_term(normalized_query, term) for term in _PLACE_QUESTION_TERMS)
+        )
+
+        if mentions_place_search:
+            return False
+
+        return mentions_city_request or (mentions_city_word and mentions_style)
 
     def _extract_category(self, normalized_query: str) -> str | None:
         for category, terms in _CATEGORY_TERMS.items():

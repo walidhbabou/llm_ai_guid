@@ -3,6 +3,7 @@ from fastapi.responses import JSONResponse
 
 from app.api.routes.ai_search import router as ai_search_router
 from app.api.routes.test_ui import router as test_ui_router
+from app.core.config import settings
 from app.core.exceptions import AppError
 from app.dto.search_dto import ApiErrorResponseDTO
 
@@ -32,8 +33,12 @@ async def generic_error_handler(_: Request, exc: Exception) -> JSONResponse:
 
 
 @app.get("/health")
-async def health() -> dict[str, str]:
-    return {"status": "ok"}
+async def health() -> dict[str, str | bool]:
+    return {
+        "status": "ok",
+        "llm_enabled": settings.llm_enabled,
+        "google_maps_enabled": bool(settings.google_maps_api_key),
+    }
 
 
 @app.get("/favicon.ico", include_in_schema=False)

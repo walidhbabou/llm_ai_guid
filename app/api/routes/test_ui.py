@@ -124,6 +124,23 @@ async def api_test_ui() -> str:
       flex-wrap: wrap;
     }
 
+    .prompt-list {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin: -2px 0 14px;
+    }
+
+    .prompt-chip {
+      border: 1px solid #d6e4e8;
+      background: linear-gradient(180deg, #f7fbfd 0%, #ffffff 100%);
+      color: #21526b;
+      border-radius: 999px;
+      padding: 8px 12px;
+      font-size: 12px;
+      cursor: pointer;
+    }
+
     .audio-panel {
       margin-top: 14px;
       padding: 14px;
@@ -299,6 +316,11 @@ async def api_test_ui() -> str:
       animation: rise 0.35s ease-out;
     }
 
+    .guide-card {
+      background: linear-gradient(135deg, #eef8fb 0%, #fffdf8 100%);
+      border-color: #cfe3ea;
+    }
+
     .place h4 {
       margin: 0 0 6px;
       font-size: 15px;
@@ -327,6 +349,21 @@ async def api_test_ui() -> str:
       text-decoration: none;
       font-size: 12px;
       font-weight: 600;
+    }
+
+    .card-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+
+    .guide-action {
+      background: #ebf5f7;
+      color: var(--accent);
+      border: 1px solid #c8e1e8;
+      font-size: 12px;
+      padding: 8px 12px;
     }
 
     .map-shell {
@@ -381,10 +418,17 @@ async def api_test_ui() -> str:
   <main class="container">
     <section class="panel">
       <h1 class="title">Assistant Touristique</h1>
-      <p class="subtitle">L'utilisateur peut poser sa question en texte, avec sa voix ou en envoyant un fichier audio, puis lire la reponse a l'ecran ou l'ecouter en audio.</p>
+      <p class="subtitle">Posez une question naturelle comme "lieu romantique au coucher de soleil" ou "ville culturelle pour photos". L'assistant peut repondre en texte, par la voix, ou via un fichier audio.</p>
 
       <label for="query">Requete utilisateur</label>
-      <textarea id="query">Donne-moi les meilleurs cafes pres de moi</textarea>
+      <textarea id="query" placeholder="Ex: un rooftop romantique a Rabat, une plage calme a Agadir, ou une ville culturelle pour photos"></textarea>
+
+      <div class="prompt-list">
+        <button class="prompt-chip" type="button" data-prompt="lieu romantique au coucher de soleil">lieu romantique au coucher de soleil</button>
+        <button class="prompt-chip" type="button" data-prompt="ville culturelle pour photos">ville culturelle pour photos</button>
+        <button class="prompt-chip" type="button" data-prompt="plage calme a Agadir">plage calme a Agadir</button>
+        <button class="prompt-chip" type="button" data-prompt="sortie famille a Rabat">sortie famille a Rabat</button>
+      </div>
 
       <div class="row">
         <div>
@@ -481,6 +525,7 @@ async def api_test_ui() -> str:
     const btnSend = document.getElementById("btn-send");
     const btnLocate = document.getElementById("btn-locate");
     const btnClear = document.getElementById("btn-clear");
+    const promptButtons = [...document.querySelectorAll("[data-prompt]")];
     const btnVoiceInput = document.getElementById("btn-voice-input");
     const btnSendAudio = document.getElementById("btn-send-audio");
     const btnRecordAudio = document.getElementById("btn-record-audio");
@@ -823,7 +868,7 @@ async def api_test_ui() -> str:
       return null;
     }
 
-    function renderMap(places) {
+    function renderMap(places, data = {}) {
       if (!map) {
         return;
       }
@@ -855,6 +900,17 @@ async def api_test_ui() -> str:
       const infoWindow = new google.maps.InfoWindow();
 
       if (!Array.isArray(places) || places.length === 0) {
+        if ((data.response_mode ?? "") === "guide") {
+          if (userCoords) {
+            map.setCenter({ lat: userCoords[0], lng: userCoords[1] });
+            map.setZoom(13);
+            mapNoteEl.textContent = "Question de conseil: votre position est affichee, sans lieu precis a cartographier.";
+          } else {
+            mapNoteEl.textContent = "Question de conseil: aucun lieu precis a afficher sur la carte.";
+          }
+          return;
+        }
+
         if (userCoords) {
           map.setCenter({ lat: userCoords[0], lng: userCoords[1] });
           map.setZoom(13);
@@ -900,6 +956,55 @@ async def api_test_ui() -> str:
       mapNoteEl.textContent = `${resultMarkers.length} lieu(x) affiche(s) sur la carte.`;
     }
 
+    function renderGuideCards(cards) {
+      cardsEl.innerHTML = "";
+      if (!Array.isArray(cards) || cards.length === 0) {
+        return false;
+      }
+
+      for (const item of cards) {
+        const card = document.createElement("article");
+        card.className = "place guide-card";
+
+        card.innerHTML = `
+          <h4>${item.title ?? "Suggestion"}</h4>
+          <p>${item.description ?? "Suggestion guide disponible."}</p>
+          <div class="card-actions"></div>
+        `;
+
+        const actionsEl = card.querySelector(".card-actions");
+        if (item.query && actionsEl) {
+          const button = document.createElement("button");
+          button.type = "button";
+          button.className = "guide-action";
+          button.textContent = "Utiliser cette idee";
+          button.addEventListener("click", () => {
+            queryInput.value = item.query;
+            queryInput.focus();
+          });
+          actionsEl.appendChild(button);
+        }
+
+        cardsEl.appendChild(card);
+      }
+
+      return true;
+    }
+
+    function renderGuideEmptyState(data) {
+      const replyText =
+        data.assistant_reply ??
+        data.message ??
+        "La demande a ete comprise, mais il n'y a pas de lieu precis a afficher pour cette question.";
+
+      cardsEl.innerHTML = `
+        <div class="place guide-card">
+          <h4>Reponse conseil</h4>
+          <p>${replyText}</p>
+        </div>
+      `;
+    }
+
     function renderPlaces(places) {
       cardsEl.innerHTML = "";
       if (!Array.isArray(places) || places.length === 0) {
@@ -931,6 +1036,27 @@ async def api_test_ui() -> str:
       }
     }
 
+    function renderResultCards(data) {
+      const places = Array.isArray(data.results) ? data.results : [];
+      if (places.length > 0) {
+        renderPlaces(places);
+        return;
+      }
+
+      const guideCards = Array.isArray(data.guide_cards) ? data.guide_cards : [];
+      if (guideCards.length > 0) {
+        renderGuideCards(guideCards);
+        return;
+      }
+
+      if ((data.response_mode ?? "") === "guide") {
+        renderGuideEmptyState(data);
+        return;
+      }
+
+      renderPlaces([]);
+    }
+
     async function parseApiResponse(response) {
       const rawText = await response.text();
       let data = {};
@@ -955,8 +1081,8 @@ async def api_test_ui() -> str:
       renderSummary(data);
       renderAssistantReply(data);
       renderSuggestedQuestions(data);
-      renderPlaces(data.results);
-      renderMap(data.results);
+      renderResultCards(data);
+      renderMap(data.results, data);
       jsonOutputEl.textContent = JSON.stringify(data, null, 2);
 
       if (data.transcribed_query) {
@@ -970,6 +1096,12 @@ async def api_test_ui() -> str:
     }
 
     function buildSuccessMessage(data, source = "text") {
+      if ((data.response_mode ?? "") === "guide") {
+        return source === "audio"
+          ? "Audio transcrit puis reponse guide generee."
+          : "Reponse guide generee.";
+      }
+
       if (source === "audio") {
         if ((data.results_count ?? 0) > 0) {
           return `Audio transcrit puis traite: ${data.results_count ?? 0} lieu(x) trouve(s).`;
@@ -1289,6 +1421,13 @@ async def api_test_ui() -> str:
         sendRequest();
       }
     });
+
+    for (const button of promptButtons) {
+      button.addEventListener("click", () => {
+        queryInput.value = button.dataset.prompt ?? "";
+        queryInput.focus();
+      });
+    }
 
     btnClear.addEventListener("click", () => {
       if (isListening && recognition) {

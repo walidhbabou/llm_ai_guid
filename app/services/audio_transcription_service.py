@@ -28,7 +28,7 @@ _LANGUAGE_ALIASES = {
 
 class AudioTranscriptionService:
     def __init__(self) -> None:
-        self._client = Groq(api_key=settings.groq_api_key) if settings.groq_api_key else None
+        self._client = Groq(api_key=settings.llm_api_key) if settings.llm_api_key else None
 
     def transcribe(
         self,
@@ -39,7 +39,7 @@ class AudioTranscriptionService:
     ) -> str:
         if self._client is None:
             raise AudioTranscriptionError(
-                "GROQ_API_KEY manquante: impossible de transcrire l'audio cote backend."
+                "Aucune cle LLM valide detectee: impossible de transcrire l'audio cote backend."
             )
 
         if not audio_bytes:

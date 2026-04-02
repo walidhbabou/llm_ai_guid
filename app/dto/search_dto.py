@@ -32,6 +32,12 @@ class PlaceDTO(BaseModel):
     google_maps_url: str | None = None
 
 
+class GuideCardDTO(BaseModel):
+    title: str
+    description: str
+    query: str | None = None
+
+
 class SearchResponseDTO(BaseModel):
     intent: str
     detected_language: str = "fr"
@@ -42,8 +48,10 @@ class SearchResponseDTO(BaseModel):
     near_me: bool
     results_count: int
     results: list[PlaceDTO]
+    response_mode: str = "places"
     assistant_reply: str | None = None
     suggested_questions: list[str] = Field(default_factory=list)
+    guide_cards: list[GuideCardDTO] = Field(default_factory=list)
     message: str | None = None
 
 

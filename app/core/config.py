@@ -18,5 +18,13 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
+    @property
+    def llm_api_key(self) -> str:
+        return self.groq_api_key.strip()
+
+    @property
+    def llm_enabled(self) -> bool:
+        return bool(self.llm_api_key)
+
 
 settings = Settings()
