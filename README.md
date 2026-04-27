@@ -39,7 +39,9 @@ pip install -r requirements.txt
 - `GOOGLE_MAPS_API_KEY`
 - `GROQ_API_KEY` (optionnel, fallback heuristique si absent)
 - `GROQ_MODEL`
-- `GROQ_SPEECH_MODEL` (pour la transcription audio backend, optionnel)
+- `GROQ_SPEECH_MODEL` (optionnel, utilise Groq Speech-to-Text si defini)
+- `LOCAL_WHISPER_MODEL` / `LOCAL_WHISPER_DEVICE` / `LOCAL_WHISPER_COMPUTE_TYPE`
+  (optionnel, transcription locale Whisper sans cle)
 
 ## Lancer le serveur
 
@@ -91,7 +93,8 @@ L'endpoint backend reste en JSON texte, mais l'interface web ajoute deux fonctio
 Details utiles:
 - la saisie vocale repose sur l'API Web Speech du navigateur,
 - la lecture audio repose sur `speechSynthesis`,
-- l'endpoint audio backend utilise Groq Speech-to-Text,
+- l'endpoint audio backend utilise Groq Speech-to-Text si la cle est presente,
+  sinon la transcription locale Whisper est utilisee,
 - pour le meilleur support micro, utilisez de preference Chrome ou Edge,
 - si le navigateur ne supporte pas l'audio, l'interface continue de fonctionner en mode texte.
 
