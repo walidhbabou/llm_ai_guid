@@ -539,6 +539,8 @@ async def api_test_ui() -> str:
     const statusEl = document.getElementById("status");
     const apiBadgeEl = document.getElementById("api-badge");
 
+    const backendAudioEnabled = __AUDIO_BACKEND_ENABLED__;
+
     const intentEl = document.getElementById("intent");
     const languageEl = document.getElementById("language");
     const cityEl = document.getElementById("city");
@@ -651,8 +653,11 @@ async def api_test_ui() -> str:
 
     function updateAudioUploadButtons() {
       const hasSelectedFile = Boolean(audioFileInput.files && audioFileInput.files.length);
-      btnSendAudio.disabled = isUploadingAudio || !hasSelectedFile;
-      btnRecordAudio.disabled = isUploadingAudio || (!mediaRecorderSupported && !isRecordingUploadAudio);
+      btnSendAudio.disabled = isUploadingAudio || !hasSelectedFile || !backendAudioEnabled;
+      btnRecordAudio.disabled =
+        isUploadingAudio ||
+        !backendAudioEnabled ||
+        (!mediaRecorderSupported && !isRecordingUploadAudio);
       btnRecordAudio.textContent = isRecordingUploadAudio
         ? "Arreter puis envoyer"
         : "Enregistrer puis envoyer";
@@ -668,9 +673,11 @@ async def api_test_ui() -> str:
       const outputState = speechSupported
         ? "Lecture audio disponible."
         : "Lecture audio indisponible sur ce navigateur.";
-      const uploadState = mediaRecorderSupported
-        ? "Envoi audio vers le backend disponible."
-        : "Envoi micro vers le backend indisponible sur ce navigateur.";
+      const uploadState = backendAudioEnabled
+        ? mediaRecorderSupported
+          ? "Envoi audio vers le backend disponible."
+          : "Envoi micro vers le backend indisponible sur ce navigateur."
+        : "Transcription backend indisponible (verifiez GROQ_API_KEY).";
       voiceSupportNoteEl.textContent = `${inputState} ${outputState} ${uploadState}`;
     }
 
@@ -1133,6 +1140,11 @@ async def api_test_ui() -> str:
     }
 
     async function sendAudioBlob(blob, filename) {
+      if (!backendAudioEnabled) {
+        setStatus("Transcription backend indisponible (verifiez GROQ_API_KEY).", "error");
+        return;
+      }
+
       if (!blob || blob.size === 0) {
         setStatus("Le fichier audio est vide ou invalide.", "error");
         return;
@@ -1188,6 +1200,11 @@ async def api_test_ui() -> str:
     }
 
     async function sendSelectedAudioFile() {
+      if (!backendAudioEnabled) {
+        setStatus("Transcription backend indisponible (verifiez GROQ_API_KEY).", "error");
+        return;
+      }
+
       const file = audioFileInput.files && audioFileInput.files[0];
       if (!file) {
         setStatus("Choisissez un fichier audio avant l'envoi.", "error");
@@ -1199,6 +1216,11 @@ async def api_test_ui() -> str:
     }
 
     async function toggleAudioRecording() {
+      if (!backendAudioEnabled) {
+        setStatus("Transcription backend indisponible (verifiez GROQ_API_KEY).", "error");
+        return;
+      }
+
       if (isRecordingUploadAudio && mediaRecorder) {
         mediaRecorder.stop();
         return;
@@ -1470,6 +1492,10 @@ async def api_test_ui() -> str:
     updateReplyAudioButtons();
     updateAudioUploadButtons();
 
+    if (!backendAudioEnabled) {
+      audioUploadNoteEl.textContent = "Transcription backend indisponible (verifiez GROQ_API_KEY).";
+    }
+
     if (speechSupported && "onvoiceschanged" in window.speechSynthesis) {
       window.speechSynthesis.onvoiceschanged = updateVoiceSupportNote;
     }
@@ -1487,4 +1513,5 @@ async def api_test_ui() -> str:
 """
         .replace("__GOOGLE_MAPS_SCRIPT__", google_maps_script)
         .replace("__GOOGLE_MAPS_KEY__", google_maps_key)
+        .replace("__AUDIO_BACKEND_ENABLED__", "true" if settings.llm_enabled else "false")
     )
