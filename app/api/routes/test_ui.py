@@ -1054,7 +1054,6 @@ async def api_test_ui() -> str:
         const card = document.createElement("article");
         card.className = "place";
 
-        const rating = place.rating ?? "-";
         const mapsLink = place.google_maps_url
           ? `<a href="${place.google_maps_url}" target="_blank" rel="noreferrer">Ouvrir Maps</a>`
           : "";
@@ -1067,7 +1066,6 @@ async def api_test_ui() -> str:
           <p>${place.description ?? "Description indisponible"}</p>
             <p>${place.address ?? "Adresse indisponible"}</p>
             <div class="meta">
-              <span>Note: ${rating}</span>
               <span>${toFixedSafe(place.latitude)}, ${toFixedSafe(place.longitude)}</span>
               ${durationLabel ? `<span>Durée: ${durationLabel}</span>` : ""}
             </div>

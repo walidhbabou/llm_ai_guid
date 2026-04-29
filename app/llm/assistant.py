@@ -113,7 +113,7 @@ class GuideAssistant:
                     "name": place.name,
                     "description": place.description,
                     "address": place.address,
-                    "rating": place.rating,
+                    "types": place.types,
                 }
                 for place in places[:5]
             ],
@@ -970,8 +970,6 @@ class GuideAssistant:
         ]
 
     def _format_place(self, place: PlaceDTO) -> str:
-        if place.rating is not None:
-            return f"{place.name} ({place.rating}/5)"
         return place.name
 
     def _humanize_category(self, category: str | None, language: str) -> str:
