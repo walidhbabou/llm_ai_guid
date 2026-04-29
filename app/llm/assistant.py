@@ -12,7 +12,6 @@ from app.llm.system_prompt import GUIDE_RESPONSE_SYSTEM_PROMPT
 _OUT_OF_SCOPE_PATTERNS = (
     r"\bcalcule\b",
     r"\bcode\b",
-    r"\bprogramme\b",
     r"\btraduis\b",
     r"\btraduire\b",
 )
@@ -33,6 +32,32 @@ _CULTURE_TERMS = ("culture", "culturel", "culturelle", "historique", "patrimoine
 _PHOTO_TERMS = ("photo", "photos", "photogenique", "instagram", "instagrammable", "shooting")
 _ROMANTIC_TERMS = ("romantique", "romantic", "couple", "amour")
 _SUNSET_TERMS = ("coucher de soleil", "sunset", "golden hour")
+_ITINERARY_TERMS = (
+    "programme",
+    "plan",
+    "itineraire",
+    "itinéraire",
+    "journee",
+    "journée",
+    "aujourd",
+    "aujourd'hui",
+    "today",
+    "day trip",
+    "avec ma femme",
+    "with my wife",
+    "couple",
+    "sortie",
+    "que faire aujourd",
+    "quoi faire aujourd",
+    "siyaha",
+    "siyaha",
+    "siyaha",
+    "blasa siyahia",
+)
+
+_DEFAULT_ITINERARY_SLOTS_FR = ("Matin", "Midi", "Après-midi", "Goûter", "Soir")
+_DEFAULT_ITINERARY_SLOTS_EN = ("Morning", "Lunch", "Afternoon", "Coffee", "Evening")
+_DEFAULT_ITINERARY_SLOTS_DARIJA = ("Sbah", "Gheda", "3chiya", "9ahwa", "L3chiya/3cha")
 
 
 class GuideAssistant:
@@ -230,6 +255,9 @@ class GuideAssistant:
         normalized_query = self._normalize_text(query)
         language = analysis.detected_language
 
+        if self._looks_like_itinerary_request(normalized_query):
+            return self._build_itinerary_reply(language, analysis.city, places)
+
         if self._looks_like_city_photo_request(normalized_query):
             return self._build_city_photo_reply(language)
 
@@ -245,6 +273,299 @@ class GuideAssistant:
             return self._build_photo_spot_reply(language, analysis.city)
 
         return None
+
+    def _looks_like_itinerary_request(self, normalized_query: str) -> bool:
+        return any(self._contains_term(normalized_query, term) for term in _ITINERARY_TERMS)
+
+    def _build_itinerary_reply(
+        self,
+        language: str,
+        city: str | None,
+        places: list[PlaceDTO],
+    ) -> tuple[str, list[str], list[GuideCardDTO]]:
+        city_segment = f" a {city}" if city and language not in {"en"} else (f" in {city}" if city else "")
+
+        if not places:
+            if language == "en":
+                return (
+                    "I can build a simple itinerary, but I need a city or your location (near me).",
+                    ["Plan a day in Marrakech", "Find places near me", "Romantic sunset spots near me"],
+                    [],
+                )
+            if language == "darija":
+                return (
+                    "N9dar ndir lik programme, walakin khassni mdina wla position dyalk (qrib menni).",
+                    ["Dir lia programme f Marrakech", "Qelleb qrib menni", "Blays romantique lghorob chams qrib menni"],
+                    [],
+                )
+            return (
+                "Je peux te faire un programme, mais il me faut une ville ou ta position (pres de moi).",
+                ["Fais-moi un programme a Marrakech", "Cherche pres de moi", "Sortie romantique pres de moi"],
+                [],
+            )
+
+        selected = places[:5]
+        slots = (
+            _DEFAULT_ITINERARY_SLOTS_EN
+            if language == "en"
+            else (_DEFAULT_ITINERARY_SLOTS_DARIJA if language == "darija" else _DEFAULT_ITINERARY_SLOTS_FR)
+        )
+
+        cards: list[GuideCardDTO] = []
+        for idx, place in enumerate(selected):
+            time_slot = slots[min(idx, len(slots) - 1)]
+            duration = self._estimate_duration_minutes(place)
+            budget_min, budget_max = self._estimate_budget_mad(place, language)
+
+            desc_parts: list[str] = []
+            if place.description:
+                desc_parts.append(place.description)
+            if place.address:
+                if language == "en":
+                    desc_parts.append(f"Address: {place.address}.")
+                elif language == "darija":
+                    desc_parts.append(f"L3onwan: {place.address}.")
+                else:
+                    desc_parts.append(f"Adresse: {place.address}.")
+
+            cards.append(
+                GuideCardDTO(
+                    title=place.name,
+                    description=" ".join(part.strip() for part in desc_parts if part and part.strip()).strip()
+                    or (place.address or place.name),
+                    query=place.name,
+                    time_slot=time_slot,
+                    duration_minutes=duration,
+                    budget_min_mad=budget_min,
+                    budget_max_mad=budget_max,
+                )
+            )
+
+        model_response = self._build_model_response_for_itinerary(language, city, cards)
+        if model_response is not None:
+            assistant_reply, suggested_questions, _ = model_response
+            return assistant_reply, suggested_questions, cards
+
+        # Fallback (no LLM available)
+        reply = self._format_itinerary_fallback_reply(language, city_segment, cards)
+        if language == "en":
+            questions = ["Make it cheaper", "Swap one stop for a museum", "Build a romantic plan near me"]
+        elif language == "darija":
+            questions = ["Bghito rkhis", "Bddl chi blasa b mat7af", "Dir programme romantique qrib menni"]
+        else:
+            questions = ["Fais-le moins cher", "Remplace une etape par un musee", "Programme romantique pres de moi"]
+
+        return reply, questions, cards
+
+    def _format_itinerary_fallback_reply(
+        self,
+        language: str,
+        city_segment: str,
+        cards: list[GuideCardDTO],
+    ) -> str:
+        # Plain-text (no markdown): structured itinerary with per-step details.
+        total_min = sum(c.budget_min_mad or 0 for c in cards)
+        total_max = sum(c.budget_max_mad or 0 for c in cards)
+        total_duration = sum(c.duration_minutes or 0 for c in cards)
+
+        if language == "en":
+            header = (
+                f"Here is a day plan{city_segment}.\n"
+                f"Total: ~{total_duration} min, {total_min}-{total_max} MAD per person (approx).\n"
+            )
+            labels = {
+                "address": "Address",
+                "idea": "Idea",
+                "duration": "Duration",
+                "budget": "Budget",
+                "tip": "Tip",
+            }
+        elif language == "darija":
+            header = (
+                f"Hada programme{city_segment}.\n"
+                f"Total: ~{total_duration} min, {total_min}-{total_max} MAD لكل واحد (ta9riban).\n"
+            )
+            labels = {
+                "address": "L3onwan",
+                "idea": "Fekra",
+                "duration": "Modda",
+                "budget": "Budget",
+                "tip": "Nsi7a",
+            }
+        else:
+            header = (
+                f"Voici un programme{city_segment}.\n"
+                f"Total: ~{total_duration} min, {total_min}-{total_max} MAD par personne (approx).\n"
+            )
+            labels = {
+                "address": "Adresse",
+                "idea": "Idée",
+                "duration": "Durée",
+                "budget": "Budget",
+                "tip": "Astuce",
+            }
+
+        grouped: dict[str, list[GuideCardDTO]] = {}
+        order: list[str] = []
+        for c in cards:
+            slot = (c.time_slot or "").strip() or ("Etape" if language != "en" else "Step")
+            if slot not in grouped:
+                grouped[slot] = []
+                order.append(slot)
+            grouped[slot].append(c)
+
+        lines: list[str] = [header.rstrip()]
+        for slot in order:
+            lines.append("")
+            lines.append(f"{slot}:")
+            for idx, c in enumerate(grouped[slot], start=1):
+                why = (c.description or "").strip()
+                duration = f"~{c.duration_minutes} min" if c.duration_minutes else ""
+                budget = (
+                    f"{c.budget_min_mad}-{c.budget_max_mad} MAD / pers (approx)"
+                    if c.budget_min_mad is not None and c.budget_max_mad is not None
+                    else ""
+                )
+                idea = self._build_generic_itinerary_idea(language, c)
+                tip = self._build_generic_itinerary_tip(language, c)
+
+                lines.append(f"{idx}) {c.title} — {why or (c.title or '').strip()}")
+                if c.query and c.query != c.title:
+                    # keep it short; query is mostly for UI action
+                    pass
+                if c.description and c.description != why:
+                    pass
+                if c.description and why and why != c.description:
+                    pass
+                if c.description and not why:
+                    pass
+                if c.description and why:
+                    pass
+                if c.query:
+                    pass
+
+                # We intentionally do not show coordinates here (not available in guide cards).
+                if c.description and not why:
+                    pass
+
+                # Address is embedded inside description sometimes; keep single "Adresse" line only if we detect it.
+                # In this backend, the description already contains "Adresse: ...", so we avoid duplicating it.
+                # We still expose idea/duration/budget/tip consistently.
+                if idea:
+                    lines.append(f"   {labels['idea']}: {idea}")
+                if duration:
+                    lines.append(f"   {labels['duration']}: {duration}")
+                if budget:
+                    lines.append(f"   {labels['budget']}: {budget}")
+                if tip:
+                    lines.append(f"   {labels['tip']}: {tip}")
+
+        return "\n".join(lines).strip()
+
+    def _build_generic_itinerary_idea(self, language: str, card: GuideCardDTO) -> str:
+        title = (card.title or "").strip()
+        desc = (card.description or "").lower()
+        if language == "en":
+            if "museum" in desc or "musee" in desc or "mat7af" in desc:
+                return "Take your time, focus on 2–3 sections you like, and grab a few photos."
+            if "restaurant" in desc:
+                return "Choose one signature dish, share a side, and keep room for a later snack."
+            if "corniche" in desc or "view" in desc or "vue" in desc:
+                return "Walk slowly, stop for photos, and enjoy the golden hour."
+            return f"Enjoy {title} at a relaxed pace and take a few good stops."
+        if language == "darija":
+            if "museum" in desc or "musee" in desc or "mat7af" in desc:
+                return "Dkhoul b rwiya, khtar 2-3 qsmat li 3jbok, w ddir chi tsawer."
+            if "restaurant" in desc:
+                return "Khtar plat principal, qssm chi haja, w khlli blas l snack mn b3d."
+            if "corniche" in desc or "vue" in desc or "view" in desc:
+                return "Tmcha b shwiya, w9ef l tsawer, w tmt3 b golden hour."
+            return f"Tmta3 b {title} b calma w ddir waqfat zwinin."
+        # fr
+        if "museum" in desc or "musee" in desc or "mat7af" in desc:
+            return "Prenez votre temps, ciblez 2–3 sections qui vous plaisent, et faites quelques photos."
+        if "restaurant" in desc:
+            return "Choisissez un plat signature, partagez un accompagnement, et gardez une place pour un snack plus tard."
+        if "corniche" in desc or "vue" in desc or "view" in desc:
+            return "Balade tranquille, pauses photo, et profitez de la golden hour."
+        return f"Profitez de {title} a votre rythme, avec quelques pauses sympa."
+
+    def _build_generic_itinerary_tip(self, language: str, card: GuideCardDTO) -> str:
+        duration = card.duration_minutes or 0
+        if language == "en":
+            if duration >= 75:
+                return "Start a bit earlier to avoid crowds, and keep 10–15 min buffer for moving around."
+            return "Keep 10 min buffer for walking and small detours."
+        if language == "darija":
+            if duration >= 75:
+                return "Bda b bkri shwiya bach tjnnb z7am, w khlli 10-15 dqiqa buffer l tmchi."
+            return "Khlّي 10 dqiqa buffer l tmchi w detours sghar."
+        # fr
+        if duration >= 75:
+            return "Commencez un peu plus tot pour eviter la foule, et gardez 10–15 min de marge entre les etapes."
+        return "Gardez ~10 min de marge pour marcher et faire de petits detours."
+
+    def _build_model_response_for_itinerary(
+        self,
+        language: str,
+        city: str | None,
+        cards: list[GuideCardDTO],
+    ) -> tuple[str | None, list[str], list[GuideCardDTO]] | None:
+        payload = {
+            "mode": "itinerary_plan",
+            "detected_language": language,
+            "city": city,
+            "steps": [
+                {
+                    "time_slot": c.time_slot,
+                    "name": c.title,
+                    "description": c.description,
+                    "duration_minutes": c.duration_minutes,
+                    "budget_min_mad": c.budget_min_mad,
+                    "budget_max_mad": c.budget_max_mad,
+                }
+                for c in cards
+            ],
+        }
+        # Reuse existing completion pipe (returns assistant_reply + suggested_questions)
+        return self._complete_response(payload, QueryAnalysisDTO(detected_language=language))
+
+    def _estimate_duration_minutes(self, place: PlaceDTO) -> int:
+        types = [t.lower() for t in (place.types or []) if isinstance(t, str)]
+        if "museum" in types:
+            return 90
+        if "park" in types:
+            return 60
+        if "restaurant" in types:
+            return 75
+        if "cafe" in types:
+            return 45
+        if "tourist_attraction" in types:
+            return 60
+        if "lodging" in types:
+            return 30
+        return 60
+
+    def _estimate_budget_mad(self, place: PlaceDTO, language: str) -> tuple[int, int]:
+        types = [t.lower() for t in (place.types or []) if isinstance(t, str)]
+        desc = (place.description or "").lower()
+
+        if any(t in types for t in ("park", "tourist_attraction")) and "restaurant" not in types and "cafe" not in types:
+            return (0, 50)
+
+        if "budget-friendly" in desc or "pas cher" in desc or "plutot pas cher" in desc or "rkhis" in desc:
+            return (40, 120)
+        if "mid-range" in desc or "gamme moyenne" in desc or "moutawassit" in desc:
+            return (120, 250)
+        if "upscale" in desc or "haut de gamme" in desc or "ghali" in desc or "premium" in desc:
+            return (250, 600)
+
+        if "cafe" in types:
+            return (25, 80)
+        if "restaurant" in types:
+            return (80, 250)
+
+        return (50, 200)
 
     def _build_city_photo_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO]]:
         if language == "en":

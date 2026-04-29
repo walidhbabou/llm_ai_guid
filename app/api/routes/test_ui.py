@@ -969,13 +969,42 @@ async def api_test_ui() -> str:
         return false;
       }
 
-      for (const item of cards) {
+      const normalizedCards = cards
+        .map((item, index) => ({ item, index }))
+        .sort((a, b) => {
+          const aSlot = String(a.item?.time_slot ?? "");
+          const bSlot = String(b.item?.time_slot ?? "");
+          if (aSlot && bSlot && aSlot !== bSlot) {
+            return aSlot.localeCompare(bSlot);
+          }
+          return a.index - b.index;
+        })
+        .map(({ item }) => item);
+
+      for (const item of normalizedCards) {
         const card = document.createElement("article");
         card.className = "place guide-card";
+
+        const slot = String(item.time_slot ?? "").trim();
+        const duration = Number(item.duration_minutes);
+        const durationLabel = Number.isFinite(duration) && duration > 0 ? `~${duration} min` : "";
+        const bMin = Number(item.budget_min_mad);
+        const bMax = Number(item.budget_max_mad);
+        const budgetLabel =
+          Number.isFinite(bMin) && Number.isFinite(bMax) && (bMin > 0 || bMax > 0)
+            ? `${bMin}-${bMax} MAD / pers (approx)`
+            : "";
+        const metaLeft = [slot, durationLabel].filter(Boolean).join(" • ");
+        const metaRight = budgetLabel;
 
         card.innerHTML = `
           <h4>${item.title ?? "Suggestion"}</h4>
           <p>${item.description ?? "Suggestion guide disponible."}</p>
+          ${
+            metaLeft || metaRight
+              ? `<div class="meta"><span>${metaLeft || "-"}</span><span>${metaRight || ""}</span></div>`
+              : ""
+          }
           <div class="card-actions"></div>
         `;
 
@@ -984,7 +1013,7 @@ async def api_test_ui() -> str:
           const button = document.createElement("button");
           button.type = "button";
           button.className = "guide-action";
-          button.textContent = "Utiliser cette idee";
+          button.textContent = "Utiliser cette etape";
           button.addEventListener("click", () => {
             queryInput.value = item.query;
             queryInput.focus();

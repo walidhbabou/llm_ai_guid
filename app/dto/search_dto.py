@@ -36,6 +36,10 @@ class GuideCardDTO(BaseModel):
     title: str
     description: str
     query: str | None = None
+    time_slot: str | None = None
+    duration_minutes: int | None = Field(default=None, ge=5, le=480)
+    budget_min_mad: int | None = Field(default=None, ge=0, le=10000)
+    budget_max_mad: int | None = Field(default=None, ge=0, le=10000)
 
 
 class SearchResponseDTO(BaseModel):

@@ -68,6 +68,22 @@ _CITY_BREAK_TOKENS = {
     "ville",
     "wifi",
 }
+_CITY_BLOCKLIST_TERMS = {
+    "aujourd",
+    "aujourdhui",
+    "aujourd hui",
+    "today",
+    "budget",
+    "prix",
+    "dh",
+    "mad",
+    "dirham",
+    "programme",
+    "itineraire",
+    "itinéraire",
+    "journee",
+    "journée",
+}
 _NEAR_ME_TERMS = (
     "pres de moi",
     "proche de moi",
@@ -330,7 +346,7 @@ _PREFERENCE_TERMS = {
     "luxe": ("luxe", "premium", "haut de gamme", "ghali", "expensive"),
     "calme": ("calme", "quiet", "tranquille", "saktiya"),
     "familial": ("familial", "famille", "family", "kids", "drari", "wlad"),
-    "romantique": ("romantique", "romantic", "couple", "amour"),
+    "romantique": ("romantique", "romantic", "couple", "amour", "ma femme", "ma copine", "wife", "girlfriend"),
     "coucher de soleil": ("coucher de soleil", "sunset", "golden hour"),
     "photos": ("photo", "photos", "photogenique", "instagram", "instagrammable", "shooting"),
     "culture": ("culture", "culturel", "culturelle", "artistique", "art", "patrimoine"),
@@ -597,6 +613,8 @@ class LLMQueryAnalyzer:
             normalized_candidate = self._normalize_text(candidate_city)
             if not normalized_candidate or "moi" in normalized_candidate:
                 continue
+            if any(term in normalized_candidate for term in _CITY_BLOCKLIST_TERMS):
+                continue
 
             words = [word for word in normalized_candidate.split() if word]
             trimmed_words: list[str] = []
@@ -611,6 +629,10 @@ class LLMQueryAnalyzer:
 
             cleaned_candidate = " ".join(words).strip()
             if not cleaned_candidate or cleaned_candidate in blocked_city_phrases:
+                continue
+            if any(term in cleaned_candidate for term in _CITY_BLOCKLIST_TERMS):
+                continue
+            if not re.search(r"[a-zA-Z\u00c0-\u017f]", cleaned_candidate):
                 continue
 
             return cleaned_candidate
