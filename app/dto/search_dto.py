@@ -30,6 +30,7 @@ class PlaceDTO(BaseModel):
     photo_url: str | None = None
     place_id: str
     google_maps_url: str | None = None
+    duration_minutes: int | None = Field(default=None, ge=1, le=480)
 
 
 class GuideCardDTO(BaseModel):

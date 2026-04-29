@@ -943,8 +943,10 @@ async def api_test_ui() -> str:
         const title = place.name ?? "Lieu";
         const addr = place.address ?? "Adresse indisponible";
         const desc = place.description ?? "Description indisponible";
+        const duration = Number(place.duration_minutes);
+        const durationLabel = Number.isFinite(duration) && duration > 0 ? `~${duration} min` : "";
         marker.addListener("click", () => {
-          infoWindow.setContent(`<strong>${title}</strong><br>${desc}<br><small>${addr}</small>`);
+          infoWindow.setContent(`<strong>${title}</strong><br>${desc}<br><small>${addr}</small>` + (durationLabel ? `<br><small>Durée: ${durationLabel}</small>` : ""));
           infoWindow.open({ anchor: marker, map });
         });
 
@@ -1057,14 +1059,18 @@ async def api_test_ui() -> str:
           ? `<a href="${place.google_maps_url}" target="_blank" rel="noreferrer">Ouvrir Maps</a>`
           : "";
 
+          const duration = Number(place.duration_minutes);
+          const durationLabel = Number.isFinite(duration) && duration > 0 ? `~${duration} min` : "";
+
         card.innerHTML = `
           <h4>${place.name ?? "Lieu"}</h4>
           <p>${place.description ?? "Description indisponible"}</p>
-          <p>${place.address ?? "Adresse indisponible"}</p>
-          <div class="meta">
-            <span>Note: ${rating}</span>
-            <span>${toFixedSafe(place.latitude)}, ${toFixedSafe(place.longitude)}</span>
-          </div>
+            <p>${place.address ?? "Adresse indisponible"}</p>
+            <div class="meta">
+              <span>Note: ${rating}</span>
+              <span>${toFixedSafe(place.latitude)}, ${toFixedSafe(place.longitude)}</span>
+              ${durationLabel ? `<span>Durée: ${durationLabel}</span>` : ""}
+            </div>
           <div class="links">${mapsLink}</div>
         `;
 

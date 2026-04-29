@@ -90,6 +90,18 @@ class AISearchService:
                 for place in raw_places
             ]
 
+        # Attach an estimated duration to each PlaceDTO so the UI can display time per place
+        try:
+            for p in mapped_places:
+                # use assistant's estimator to keep durations consistent with guide cards
+                try:
+                    p.duration_minutes = self.assistant._estimate_duration_minutes(p)
+                except Exception:
+                    p.duration_minutes = None
+        except Exception:
+            # defensive: if mapping fails, continue without durations
+            pass
+
         assistant_reply, suggested_questions, guide_cards = self.assistant.build_response(
             query=query,
             analysis=analysis,
