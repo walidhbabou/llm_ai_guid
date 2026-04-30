@@ -1,6 +1,8 @@
 from fastapi import UploadFile
 
 from app.clients.google_maps_client import GoogleMapsClient
+from fastapi import HTTPException
+from app.core.exceptions import GoogleMapsError
 from app.dto.search_dto import AudioSearchResponseDTO, SearchResponseDTO
 from app.llm.assistant import GuideAssistant
 from app.mappers.place_mapper import map_google_place_to_dto
@@ -19,7 +21,11 @@ class AISearchService:
 
     def _get_google_maps(self) -> GoogleMapsClient:
         if self.google_maps is None:
-            self.google_maps = GoogleMapsClient()
+            try:
+                self.google_maps = GoogleMapsClient()
+            except GoogleMapsError as exc:
+                # Surface a clear HTTP error for missing/invalid Maps configuration in production
+                raise HTTPException(status_code=500, detail=str(exc)) from exc
         return self.google_maps
 
     async def search(

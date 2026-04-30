@@ -335,6 +335,44 @@ async def api_test_ui() -> str:
       min-height: 32px;
     }
 
+    .photo-gallery {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(64px, 1fr));
+      gap: 6px;
+      margin: 8px 0 10px;
+    }
+
+    .photo-gallery a {
+      display: block;
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid #eadfca;
+      background: #f7f3ea;
+      aspect-ratio: 1 / 1;
+    }
+
+    .photo-gallery img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    .photo-gallery.more-only {
+      grid-template-columns: repeat(auto-fit, minmax(88px, 1fr));
+    }
+
+    .photo-more {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 8px;
+      font-size: 11px;
+      color: #6d5532;
+      background: #fff8ef;
+    }
+
     .meta {
       display: flex;
       justify-content: space-between;
@@ -565,6 +603,7 @@ async def api_test_ui() -> str:
     let map = null;
     let resultMarkers = [];
     let userMarker = null;
+    let routePolyline = null;
     let recognition = null;
     let isListening = false;
     let voiceSessionPrefix = "";
@@ -600,6 +639,7 @@ async def api_test_ui() -> str:
     function normalizeVoiceLang(lang) {
       const value = String(lang || "").toLowerCase();
       if (value.startsWith("fr")) return "fr-FR";
+      if (value.startsWith("darija")) return "ar-MA";
       if (value.startsWith("ar")) return "ar-MA";
       if (value.startsWith("en")) return "en-US";
       return voiceLangSelect.value || "fr-FR";
@@ -864,6 +904,10 @@ async def api_test_ui() -> str:
         marker.setMap(null);
       }
       resultMarkers = [];
+      if (routePolyline) {
+        routePolyline.setMap(null);
+        routePolyline = null;
+      }
     }
 
     function getUserCoordsFromInputs() {
@@ -873,6 +917,79 @@ async def api_test_ui() -> str:
         return [lat, lng];
       }
       return null;
+    }
+
+    function looksLikeTourProgram(data = {}) {
+      const text = [
+        data?.assistant_reply ?? "",
+        ...(Array.isArray(data?.guide_cards) ? data.guide_cards.map((c) => String(c?.time_slot ?? "")) : []),
+      ]
+        .join(" ")
+        .toLowerCase();
+      return (
+        text.includes("programme") ||
+        text.includes("itineraire") ||
+        text.includes("itinéraire") ||
+        text.includes("day plan") ||
+        text.includes("sortie")
+      );
+    }
+
+    function distanceKm(a, b) {
+      const toRad = (deg) => (deg * Math.PI) / 180;
+      const lat1 = Number(a?.latitude);
+      const lng1 = Number(a?.longitude);
+      const lat2 = Number(b?.latitude);
+      const lng2 = Number(b?.longitude);
+      if (![lat1, lng1, lat2, lng2].every(Number.isFinite)) {
+        return Number.POSITIVE_INFINITY;
+      }
+      const R = 6371;
+      const dLat = toRad(lat2 - lat1);
+      const dLng = toRad(lng2 - lng1);
+      const q =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) * Math.sin(dLng / 2);
+      return 2 * R * Math.atan2(Math.sqrt(q), Math.sqrt(1 - q));
+    }
+
+    function buildRouteOrder(places, userCoords = null) {
+      const valid = (Array.isArray(places) ? places : []).filter((p) =>
+        Number.isFinite(Number(p?.latitude)) && Number.isFinite(Number(p?.longitude))
+      );
+      if (valid.length <= 2) {
+        return valid;
+      }
+
+      const remaining = [...valid];
+      const route = [];
+
+      let current = null;
+      if (Array.isArray(userCoords) && userCoords.length === 2) {
+        const [ulat, ulng] = userCoords;
+        current = { latitude: ulat, longitude: ulng };
+      } else {
+        current = remaining[0];
+        route.push(current);
+        remaining.splice(0, 1);
+      }
+
+      while (remaining.length > 0) {
+        let bestIdx = 0;
+        let bestDist = Number.POSITIVE_INFINITY;
+        for (let i = 0; i < remaining.length; i += 1) {
+          const d = distanceKm(current, remaining[i]);
+          if (d < bestDist) {
+            bestDist = d;
+            bestIdx = i;
+          }
+        }
+        const next = remaining.splice(bestIdx, 1)[0];
+        route.push(next);
+        current = next;
+      }
+
+      return route;
     }
 
     function renderMap(places, data = {}) {
@@ -928,8 +1045,11 @@ async def api_test_ui() -> str:
         return;
       }
 
+      const routePlaces = buildRouteOrder(places, userCoords);
+      const shouldDrawRouteLine = routePlaces.length >= 2 && (looksLikeTourProgram(data) || routePlaces.length >= 3);
       const bounds = new google.maps.LatLngBounds();
-      for (const place of places) {
+      for (let idx = 0; idx < routePlaces.length; idx += 1) {
+        const place = routePlaces[idx];
         const lat = Number(place.latitude);
         const lng = Number(place.longitude);
         if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
@@ -939,6 +1059,7 @@ async def api_test_ui() -> str:
         const marker = new google.maps.Marker({
           position: { lat, lng },
           map,
+          label: shouldDrawRouteLine ? String(idx + 1) : undefined,
         });
         const title = place.name ?? "Lieu";
         const addr = place.address ?? "Adresse indisponible";
@@ -962,7 +1083,19 @@ async def api_test_ui() -> str:
         map.fitBounds(bounds, 40);
       }
 
-      mapNoteEl.textContent = `${resultMarkers.length} lieu(x) affiche(s) sur la carte.`;
+      if (shouldDrawRouteLine) {
+        routePolyline = new google.maps.Polyline({
+          path: routePlaces.map((p) => ({ lat: Number(p.latitude), lng: Number(p.longitude) })),
+          geodesic: true,
+          strokeColor: "#e76f51",
+          strokeOpacity: 0.9,
+          strokeWeight: 4,
+        });
+        routePolyline.setMap(map);
+        mapNoteEl.textContent = `${resultMarkers.length} lieu(x) lies en programme (ordre 1 -> ${resultMarkers.length}).`;
+      } else {
+        mapNoteEl.textContent = `${resultMarkers.length} lieu(x) affiche(s) sur la carte.`;
+      }
     }
 
     function renderGuideCards(cards) {
@@ -1058,17 +1191,41 @@ async def api_test_ui() -> str:
           ? `<a href="${place.google_maps_url}" target="_blank" rel="noreferrer">Ouvrir Maps</a>`
           : "";
 
-          const duration = Number(place.duration_minutes);
-          const durationLabel = Number.isFinite(duration) && duration > 0 ? `~${duration} min` : "";
+        const duration = Number(place.duration_minutes);
+        const durationLabel = Number.isFinite(duration) && duration > 0 ? `~${duration} min` : "";
+        const photoUrls = Array.isArray(place.photo_urls) ? place.photo_urls.filter(Boolean) : [];
+        const visiblePhotos = photoUrls.slice(0, 6);
+        const extraPhotoCount = Math.max(0, photoUrls.length - visiblePhotos.length);
+        const photoGallery = visiblePhotos.length
+          ? `
+            <div class="photo-gallery ${extraPhotoCount ? "more-only" : ""}">
+              ${visiblePhotos
+                .map(
+                  (url, index) => `
+                    <a href="${url}" target="_blank" rel="noreferrer" aria-label="Photo ${index + 1} de ${place.name ?? "ce lieu"}">
+                      <img src="${url}" alt="Photo ${index + 1} de ${place.name ?? "ce lieu"}" loading="lazy" />
+                    </a>
+                  `
+                )
+                .join("")}
+              ${
+                extraPhotoCount
+                  ? `<div class="photo-more">+${extraPhotoCount} autres photos</div>`
+                  : ""
+              }
+            </div>
+          `
+          : "";
 
         card.innerHTML = `
           <h4>${place.name ?? "Lieu"}</h4>
           <p>${place.description ?? "Description indisponible"}</p>
-            <p>${place.address ?? "Adresse indisponible"}</p>
-            <div class="meta">
-              <span>${toFixedSafe(place.latitude)}, ${toFixedSafe(place.longitude)}</span>
-              ${durationLabel ? `<span>Durée: ${durationLabel}</span>` : ""}
-            </div>
+          ${photoGallery}
+          <p>${place.address ?? "Adresse indisponible"}</p>
+          <div class="meta">
+            <span>${toFixedSafe(place.latitude)}, ${toFixedSafe(place.longitude)}</span>
+            ${durationLabel ? `<span>Durée: ${durationLabel}</span>` : ""}
+          </div>
           <div class="links">${mapsLink}</div>
         `;
 

@@ -13,8 +13,10 @@ class ResponseFormatterService:
         guide_cards = guide_cards or []
         response_mode = "places"
         message = None
+        # Normalize legacy/alternate response modes
+        # Some older code paths may set `response_mode` to "guide"; treat it as "itinerary".
         if guide_cards or (analysis.intent == "other" and assistant_reply):
-            response_mode = "guide"
+            response_mode = "itinerary"
             if not places:
                 message = "Reponse guide generee pour cette demande."
         elif analysis.intent == "search_places" and not places:

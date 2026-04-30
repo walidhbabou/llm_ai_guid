@@ -153,8 +153,6 @@ def _build_description(place: dict, language: str) -> str | None:
         extras = ", ".join([x for x in (status_label, price_label) if x])
         if extras:
             base = f"{base} ({extras})."
-        if address:
-            return f"{base} Located at {address}."
         return base
 
     if language == "darija":
@@ -183,8 +181,6 @@ def _build_description(place: dict, language: str) -> str | None:
         extras = ", ".join([x for x in (status_label, price_label) if x])
         if extras:
             base = f"{base} ({extras})."
-        if address:
-            return f"{base} Kayn f {address}."
         return base
 
     # fr
@@ -213,8 +209,6 @@ def _build_description(place: dict, language: str) -> str | None:
     extras = ", ".join([x for x in (status_label, price_label) if x])
     if extras:
         base = f"{base} ({extras})."
-    if address:
-        return f"{base} Situe a {address}."
     return base
 
 
@@ -228,10 +222,15 @@ def map_google_place_to_dto(
     photos = place.get("photos", [])
 
     photo_url = None
+    photo_urls: list[str] = []
     if photos:
-        ref = photos[0].get("photo_reference")
-        if ref:
-            photo_url = google_client.build_photo_url(ref)
+        for item in photos[:8]:
+            ref = item.get("photo_reference")
+            if not ref:
+                continue
+            photo_urls.append(google_client.build_photo_url(ref))
+        if photo_urls:
+            photo_url = photo_urls[0]
 
     place_id = place.get("place_id", "")
 
@@ -244,6 +243,7 @@ def map_google_place_to_dto(
         rating=place.get("rating"),
         types=place.get("types", []),
         photo_url=photo_url,
+        photo_urls=photo_urls,
         place_id=place_id,
         google_maps_url=(
             f"https://www.google.com/maps/place/?q=place_id:{place_id}" if place_id else None

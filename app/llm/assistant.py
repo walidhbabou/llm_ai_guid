@@ -7,6 +7,7 @@ from groq import Groq
 
 from app.core.config import settings
 from app.dto.search_dto import GuideCardDTO, PlaceDTO, QueryAnalysisDTO
+from app.llm.gemini_client import GroqCompatibleGemini
 from app.llm.system_prompt import GUIDE_RESPONSE_SYSTEM_PROMPT
 
 _OUT_OF_SCOPE_PATTERNS = (
@@ -59,10 +60,71 @@ _DEFAULT_ITINERARY_SLOTS_FR = ("Matin", "Midi", "Après-midi", "Goûter", "Soir"
 _DEFAULT_ITINERARY_SLOTS_EN = ("Morning", "Lunch", "Afternoon", "Coffee", "Evening")
 _DEFAULT_ITINERARY_SLOTS_DARIJA = ("Sbah", "Gheda", "3chiya", "9ahwa", "L3chiya/3cha")
 
+_RABAT_ITINERARY_FR = """Commence ta journée au cœur de Rabat par une immersion dans son histoire et son atmosphère unique. Le matin, dirige-toi vers la majestueuse Kasbah des Oudayas, un lieu emblématique aux ruelles blanches et bleues, offrant une vue spectaculaire sur l'océan Atlantique. Prends le temps de te perdre dans ses petites allées, puis fais une pause au célèbre Café Maure pour savourer un thé à la menthe avec des pâtisseries marocaines.
+
+Continue ensuite vers la Tour Hassan et le Mausolée Mohammed V, symboles historiques et architecturaux de la ville. L'ambiance y est calme et solennelle, idéale pour apprécier la richesse culturelle du Maroc.
+
+À midi, dirige-toi vers la marina de Bouregreg pour un déjeuner avec vue sur le fleuve et les bateaux. L'endroit est moderne et agréable, parfait pour se détendre avant de reprendre la visite.
+
+L'après-midi, explore la médina de Rabat, plus authentique et moins touristique que d'autres villes. Tu pourras y découvrir l'artisanat local, acheter des souvenirs et ressentir le rythme de vie traditionnel marocain.
+
+Termine ta journée par une balade sur la plage au coucher du soleil. Le bruit des vagues et la lumière dorée offrent une ambiance paisible pour conclure cette journée riche en découvertes."""
+
+_RABAT_ITINERARY_EN = """Start your day in the heart of Rabat with a journey through its layered history and breezy Atlantic atmosphere. Head first to the Kasbah of the Udayas, a stunning medina perched above the river, with whitewashed alleys and blue-painted doors that frame views of the ocean. Take your time wandering its quiet lanes and stop for a mint tea at the old Moorish café overlooking the water.
+
+From there, make your way to the Hassan Tower and the Mohammed V Mausoleum, two of Morocco's most iconic landmarks side by side. The open plaza is peaceful in the morning light, and the craftsmanship of the mausoleum is genuinely breathtaking.
+
+Around midday, head down to the Bouregreg Marina for lunch with a view of the river and the old medina of Salé across the water. It is a relaxed, modern spot that offers a nice contrast to the historic morning.
+
+In the afternoon, dive into Rabat's medina — smaller and less crowded than Fez or Marrakech, it feels genuinely lived-in. Browse local crafts, pick up a souvenir, and soak up the rhythms of daily Moroccan life.
+
+End the day with a walk along Rabat Beach as the sun drops toward the horizon. The sound of the waves, the golden light, and the ocean air make for a perfect close to a rich and rewarding day."""
+
+_RABAT_ITINERARY_DARIJA = """Bda nharek f qelb Rbat, mdina li fihà l tarikh w nefes lbaher. F sbah, mchi l Kasbah Lwdaya, blasa iconic b zz9aq byed w zar9in w manzar 3la l Atlantic. Tdowwer f zzwawey diyalha b shwiya, w sted f Café Maure bach tsherb atay b na3na3 m3a hlwiyat maghribiya.
+
+Mn ba3d, mchi l Tour Hassan w Mawsolee Mohammed V. Had ljuw howa hadi w kayn l wqar — mzyan bash tqdir t7ess b 3omq tarikh lmaghrib.
+
+F l ghda, nazzel l Bouregreg Marina. Fhad l blassa tl9a makan m3asri w zwin, mzyan bach takol w tertta7 qbel ma tkammel siyahtek.
+
+F l 3chiya, kel lmedina dyal Rbat — aqel d'affluence mn medina Fes aw Marrakech, w fihà nafs dyal l7anotat, l snayyi3, w 7it n3ach dyal sharab. Mzyana bash tshouf shi souvenir w testa3mel l7awa dyal l medina l7qiqiya.
+
+Khtem nharek b promenade 3la plage Rbat m3a l ghroob. Sawt lmawj w daw dhahabi dial chems kay3tiw ljaw ideal bach termm had nhar zwine."""
+
+_MARRAKECH_ITINERARY_FR = """La journée commence dans la Médina de Marrakech, là où les couleurs, les sons et les parfums t'enveloppent dès les premières heures. Le matin appartient aux ruelles calmes avant que l'agitation ne s'installe — c'est le meilleur moment pour visiter la medersa Ben Youssef, chef-d'œuvre de l'architecture arabe, ou pour se perdre dans les souks de teinturerie et d'épices.
+
+En milieu de matinée, prends un café ou un jus frais dans l'un des petits établissements cachés de la Médina, loin de l'effervescence des grandes places. Profite de ce moment de calme avant la foule de midi.
+
+Pour le déjeuner, dirige-toi vers un rooftop qui surplombe les toits ocres de la ville. La vue sur les minarets, avec l'Atlas en toile de fond par temps clair, vaut à elle seule le détour.
+
+L'après-midi, visite les jardins Majorelle ou les Jardins de la Ménara pour une pause verdoyante et fraîche, loin du brouhaha des souks. Ces espaces offrent un contraste saisissant avec l'agitation de la Médina.
+
+Quand le soleil commence à décliner, rejoins la place Jemaa el-Fna. C'est là que Marrakech révèle toute sa magie : musiciens gnaoua, vendeurs de jus d'orange fraîchement pressé et fumées des grillades du soir créent une atmosphère unique que peu de villes au monde peuvent égaler."""
+
+_MARRAKECH_ITINERARY_EN = """Marrakech rewards those who rise early. Start your morning in the medina before the crowds arrive — the air is cooler, the light is golden, and the narrow alleys feel like a living museum. Make your way to the Ben Youssef Medersa, a masterpiece of Andalusian architecture with intricate tilework and carved stucco that will stop you in your tracks.
+
+Spend mid-morning wandering the souks: the dyers' quarter, the spice stalls, the leather workshops. Let yourself get pleasantly lost — that is part of the experience. Grab a fresh orange juice from a street cart when you need a break.
+
+For lunch, find a rooftop terrace with views over the ochre rooftops and distant Atlas Mountains. The contrast of the bustling medina below and the open sky above is something you will not forget.
+
+In the afternoon, escape the midday heat in the lush Majorelle Garden or the serene Menara Gardens. Both are beautiful, peaceful, and a world apart from the energy of the souks.
+
+As dusk falls, make your way to Jemaa el-Fna square and watch the city transform. Musicians, storytellers, food stalls, and acrobats fill the space in a spectacle that has enchanted travellers for centuries. Stay for dinner at the square's edge and let the evening unfold around you."""
+
+_FEZ_ITINERARY_FR = """Fès se mérite dès les premières heures du matin, avant que la chaleur et l'affluence ne s'installent. Commence par la célèbre tannerie de Chouara, l'une des plus vieilles et des plus pittoresques du monde — les terrasses des maisons voisines offrent une vue plongeante sur les cuves de couleur qui teignent le cuir depuis des siècles. Prends quelques feuilles de menthe : elles atténuent les odeurs et ajoutent un peu de fraîcheur à l'expérience.
+
+Poursuis dans les dédales de la médina de Fès el-Bali, classée au patrimoine mondial de l'UNESCO. C'est l'une des médinas les mieux préservées du monde arabe — ses ruelles peuvent descendre à un mètre de largeur, et chaque tournant réserve une surprise : une porte monumentale, un souk de ferronnerie, un morceau de mosaïque oubliée.
+
+À midi, fais une halte dans un riad pour un repas traditionnel — tajine, bastilla, ou harira selon la saison. Le cadre d'un patio ombragé avec une fontaine au centre est la meilleure façon de souffler entre deux visites.
+
+L'après-midi, visite la medersa Bou Inania, dont l'architecture et les détails sculptés rivalisent avec les plus beaux monuments d'Andalousie. Non loin, la mosquée des Andalous témoigne des échanges culturels qui ont fait la richesse de Fès au fil des siècles.
+
+Termine la journée en montant sur un point de vue dominant la ville, pour embrasser du regard le patchwork de toits, de minarets et de terrasses qui s'étale à perte de vue. Le coucher de soleil sur Fès est une image que l'on garde longtemps."""
+
 
 class GuideAssistant:
     def __init__(self) -> None:
-        self._client = Groq(api_key=settings.llm_api_key) if settings.llm_api_key else None
+        self._groq_client = Groq(api_key=settings.llm_api_key) if settings.llm_api_key else None
+        self._gemini_client = GroqCompatibleGemini() if settings.gemini_enabled else None
 
     def build_response(
         self,
@@ -112,7 +174,6 @@ class GuideAssistant:
                 {
                     "name": place.name,
                     "description": place.description,
-                    "address": place.address,
                     "types": place.types,
                 }
                 for place in places[:5]
@@ -137,47 +198,62 @@ class GuideAssistant:
         payload: dict[str, Any],
         analysis: QueryAnalysisDTO,
     ) -> tuple[str | None, list[str], list[GuideCardDTO]] | None:
-        if self._client is None:
+        is_itinerary = payload.get("mode") == "itinerary_plan"
+        clients: list[tuple[Any, str]] = []
+
+        # Gemini writes the final narrative first; Groq remains the fallback.
+        if self._gemini_client is not None:
+            clients.append((self._gemini_client, settings.gemini_model))
+        if self._groq_client is not None:
+            clients.append((self._groq_client, settings.groq_model))
+
+        if not clients:
             return None
 
-        try:
-            completion = self._client.chat.completions.create(
-                model=settings.groq_model,
-                temperature=0.2,
-                max_completion_tokens=260,
-                response_format={"type": "json_object"},
-                messages=[
-                    {"role": "system", "content": GUIDE_RESPONSE_SYSTEM_PROMPT},
-                    {
-                        "role": "user",
-                        "content": (
-                            "Utilise uniquement les informations suivantes pour produire la reponse.\n"
-                            f"{json.dumps(payload, ensure_ascii=False)}"
-                        ),
-                    },
-                ],
+        max_tokens = 900 if is_itinerary else 420
+        temperature = 0.55 if is_itinerary else 0.35
+
+        for client, model_name in clients:
+            try:
+                completion = client.chat.completions.create(
+                    model=model_name,
+                    temperature=temperature,
+                    max_completion_tokens=max_tokens,
+                    response_format={"type": "json_object"},
+                    messages=[
+                        {"role": "system", "content": GUIDE_RESPONSE_SYSTEM_PROMPT},
+                        {
+                            "role": "user",
+                            "content": (
+                                "Utilise uniquement les informations suivantes pour produire la reponse.\n"
+                                f"{json.dumps(payload, ensure_ascii=False)}"
+                            ),
+                        },
+                    ],
+                )
+            except Exception:
+                continue
+
+            raw_content = completion.choices[0].message.content or "{}"
+            data = self._safe_json_parse(raw_content)
+            if not data:
+                continue
+
+            assistant_reply = data.get("assistant_reply")
+            if not isinstance(assistant_reply, str):
+                continue
+
+            cleaned_reply = assistant_reply.strip()
+            if not cleaned_reply:
+                continue
+
+            suggested_questions = self._clean_suggested_questions(
+                data.get("suggested_questions"),
+                analysis,
             )
-        except Exception:
-            return None
+            return cleaned_reply, suggested_questions, []
 
-        raw_content = completion.choices[0].message.content or "{}"
-        data = self._safe_json_parse(raw_content)
-        if not data:
-            return None
-
-        assistant_reply = data.get("assistant_reply")
-        if not isinstance(assistant_reply, str):
-            return None
-
-        cleaned_reply = assistant_reply.strip()
-        if not cleaned_reply:
-            return None
-
-        suggested_questions = self._clean_suggested_questions(
-            data.get("suggested_questions"),
-            analysis,
-        )
-        return cleaned_reply, suggested_questions, []
+        return None
 
     def _safe_json_parse(self, raw_text: str) -> dict[str, Any] | None:
         try:
@@ -345,6 +421,40 @@ class GuideAssistant:
         if model_response is not None:
             assistant_reply, suggested_questions, _ = model_response
             return assistant_reply, suggested_questions, cards
+
+        # Hardcoded immersive itineraries for specific cities/languages
+        _HARDCODED: dict[tuple[str, str], str] = {
+            ("rabat", "fr"): _RABAT_ITINERARY_FR,
+            ("rabat", "en"): _RABAT_ITINERARY_EN,
+            ("rabat", "darija"): _RABAT_ITINERARY_DARIJA,
+            ("marrakech", "fr"): _MARRAKECH_ITINERARY_FR,
+            ("marrakech", "en"): _MARRAKECH_ITINERARY_EN,
+            ("fes", "fr"): _FEZ_ITINERARY_FR,
+            ("fez", "fr"): _FEZ_ITINERARY_FR,
+            ("fez", "en"): _FEZ_ITINERARY_FR,
+        }
+        if city:
+            hardcoded_text = _HARDCODED.get((city.lower(), language))
+            if hardcoded_text:
+                if language == "en":
+                    suggested_questions = [
+                        "Add more cultural spots",
+                        "Make it budget-friendly",
+                        "Plan a romantic evening",
+                    ]
+                elif language == "darija":
+                    suggested_questions = [
+                        "Zid lia blasat thaqafiya",
+                        "Khliha rkhisa",
+                        "Dir programme romantique",
+                    ]
+                else:
+                    suggested_questions = [
+                        "Ajoute des lieux culturels",
+                        "Fais un programme moins cher",
+                        "Plan pour le coucher de soleil",
+                    ]
+                return hardcoded_text, suggested_questions, cards
 
         # Fallback (no LLM available)
         reply = self._format_itinerary_fallback_reply(language, city_segment, cards)

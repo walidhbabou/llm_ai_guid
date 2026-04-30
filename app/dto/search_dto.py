@@ -45,6 +45,7 @@ class PlaceDTO(BaseModel):
     rating: float | None = None
     types: list[str] = Field(default_factory=list)
     photo_url: str | None = None
+    photo_urls: list[str] = Field(default_factory=list)
     place_id: str
     google_maps_url: str | None = None
     duration_minutes: int | None = Field(default=None, ge=1, le=480)
@@ -119,7 +120,8 @@ class SearchResponseDTO(BaseModel):
     near_me: bool
     results_count: int
     results: list[PlaceDTO]
-    response_mode: Literal["places", "itinerary"] = "places"
+    # Accept legacy 'guide' mode as well for backward compatibility with older deployments
+    response_mode: Literal["places", "itinerary", "guide"] = "places"
     assistant_reply: str | None = None
     suggested_questions: list[str] = Field(default_factory=list)
     guide_cards: list[GuideCardDTO] = Field(default_factory=list)

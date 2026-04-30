@@ -706,4 +706,10 @@ class LLMQueryAnalyzer:
 
         if not candidate:
             return heuristic_language
-        return language_aliases.get(candidate, candidate if len(candidate) <= 12 else heuristic_language)
+        resolved_language = language_aliases.get(candidate, candidate if len(candidate) <= 12 else heuristic_language)
+
+        # Prefer French for mixed French/darija queries when the heuristic sees no clear darija markers.
+        if resolved_language == "darija" and heuristic_language == "fr":
+            return "fr"
+
+        return resolved_language

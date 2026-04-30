@@ -38,7 +38,9 @@ pip install -r requirements.txt
 3. Copier `.env.example` en `.env` et renseigner:
 - `GOOGLE_MAPS_API_KEY`
 - `GROQ_API_KEY` (optionnel, fallback heuristique si absent)
+- `GEMINI_API_KEY` (optionnel, pour la génération narrative Gemini Flash)
 - `GROQ_MODEL`
+- `GEMINI_MODEL` (optionnel, défaut `gemini-2.0-flash`)
 - `GROQ_SPEECH_MODEL` (optionnel, utilise Groq Speech-to-Text si defini)
 - `LOCAL_WHISPER_MODEL` / `LOCAL_WHISPER_DEVICE` / `LOCAL_WHISPER_COMPUTE_TYPE`
   (optionnel, transcription locale Whisper sans cle)
@@ -75,7 +77,22 @@ Variables disponibles dans `.env.example`:
 
 Notes:
 - Si la carte n'apparait pas sur `/ui`, verifier que `GOOGLE_MAPS_API_KEY` est bien defini.
+- Si vous voyez `ApiNotActivatedMapError`, ce n'est pas un bug du code: dans Google Cloud, activez `Maps JavaScript API` pour le projet de la cle, puis verifiez que le billing est actif et que les restrictions HTTP referrer incluent votre domaine ou `http://localhost:*`.
+- Gardez une seule valeur `GOOGLE_MAPS_API_KEY` dans `.env`. Si plusieurs lignes existent, la derniere gagne et peut pointer vers un autre projet Google Cloud.
+- `GEMINI_API_KEY` sert au LLM, pas a Google Maps. Elle permet d'utiliser Gemini pour les reponses narratives (itineraire, description, FAQ) quand elle est presente.
 - Si vous voyez une erreur 500 au boot, verifier les logs Render et les variables d'environnement.
+
+## Utiliser Gemini au lieu de Groq pour les reponses narratives
+
+1. Ajouter dans `.env`:
+
+```env
+GEMINI_API_KEY=votre_cle_gemini
+GEMINI_MODEL=gemini-2.0-flash
+```
+
+2. Redemarrer le serveur.
+3. Les requetes d'itineraire utiliseront Gemini Flash pour la partie narrative, avec Groq conserve pour l'analyse d'intention et le fallback.
 
 ## Endpoint principal
 
@@ -147,6 +164,10 @@ Avec geolocalisation (utile pour "proches de moi"):
       "rating": 4.5,
       "types": ["cafe", "food", "point_of_interest"],
       "photo_url": "https://maps.googleapis.com/maps/api/place/photo?...",
+      "photo_urls": [
+        "https://maps.googleapis.com/maps/api/place/photo?...",
+        "https://maps.googleapis.com/maps/api/place/photo?..."
+      ],
       "place_id": "ChIJxxxx",
       "google_maps_url": "https://www.google.com/maps/place/?q=place_id:ChIJxxxx"
     }

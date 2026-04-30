@@ -4,7 +4,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     google_maps_api_key: str = ""
     groq_api_key: str = ""
+    gemini_api_key: str = ""
     groq_model: str = "meta-llama/llama-4-scout-17b-16e-instruct"
+    gemini_model: str = "gemini-2.0-flash"
     groq_speech_model: str = "whisper-large-v3"
     local_whisper_model: str = "base"
     local_whisper_device: str = "cpu"
@@ -28,6 +30,10 @@ class Settings(BaseSettings):
     @property
     def llm_enabled(self) -> bool:
         return bool(self.llm_api_key)
+
+    @property
+    def gemini_enabled(self) -> bool:
+        return bool(self.gemini_api_key.strip())
 
 
 settings = Settings()

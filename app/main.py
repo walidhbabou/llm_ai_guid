@@ -37,6 +37,7 @@ async def health() -> dict[str, str | bool]:
     return {
         "status": "ok",
         "llm_enabled": settings.llm_enabled,
+        "gemini_enabled": settings.gemini_enabled,
         "google_maps_enabled": bool(settings.google_maps_api_key),
     }
 
