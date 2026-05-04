@@ -1,3 +1,4 @@
+import asyncio
 import os
 import tempfile
 from pathlib import Path
@@ -38,7 +39,7 @@ class AudioTranscriptionService:
     def __init__(self) -> None:
         self._client = Groq(api_key=settings.llm_api_key) if settings.llm_api_key else None
 
-    def transcribe(
+    async def transcribe(
         self,
         *,
         audio_bytes: bytes,
@@ -58,10 +59,15 @@ class AudioTranscriptionService:
         self._validate_extension(safe_filename)
 
         if self._client is None:
-            return self._transcribe_local(
-                audio_bytes=audio_bytes,
-                filename=safe_filename,
-                language=language,
+            # Run local transcription in executor to avoid blocking the event loop
+            loop = asyncio.get_event_loop()
+            return await loop.run_in_executor(
+                None,
+                lambda: self._transcribe_local(
+                    audio_bytes=audio_bytes,
+                    filename=safe_filename,
+                    language=language,
+                ),
             )
 
         request_payload = {

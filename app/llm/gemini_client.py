@@ -33,7 +33,7 @@ class _GeminiCompletions:
         *,
         model: str,
         temperature: float = 0.2,
-        max_completion_tokens: int = 260,
+        max_completion_tokens: int = 1200,
         response_format: dict[str, Any] | None = None,
         messages: list[dict[str, Any]],
     ) -> _GeminiCompletion:

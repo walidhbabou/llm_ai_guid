@@ -108,11 +108,20 @@ class AISearchService:
             # defensive: if mapping fails, continue without durations
             pass
 
-        assistant_reply, suggested_questions, guide_cards = self.assistant.build_response(
+        assistant_reply, suggested_questions, guide_cards, places_descriptions = self.assistant.build_response(
             query=query,
             analysis=analysis,
             places=mapped_places,
         )
+
+        # Apply LLM-generated descriptions to places if available
+        if places_descriptions:
+            # Normalize keys to match place names (case-insensitive and trimmed)
+            norm_descriptions = {str(k).strip().lower(): v for k, v in places_descriptions.items()}
+            for p in mapped_places:
+                name_key = p.name.strip().lower()
+                if name_key in norm_descriptions:
+                    p.description = norm_descriptions[name_key]
 
         return self.response_formatter.build_search_response(
             analysis,
@@ -218,7 +227,7 @@ class AISearchService:
     ) -> AudioSearchResponseDTO:
         try:
             audio_bytes = await audio.read()
-            transcribed_query = self.audio_transcription.transcribe(
+            transcribed_query = await self.audio_transcription.transcribe(
                 audio_bytes=audio_bytes,
                 filename=audio.filename or "question.webm",
                 language=language,

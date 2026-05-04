@@ -132,7 +132,7 @@ class GuideAssistant:
         query: str,
         analysis: QueryAnalysisDTO,
         places: list[PlaceDTO],
-    ) -> tuple[str | None, list[str], list[GuideCardDTO]]:
+    ) -> tuple[str | None, list[str], list[GuideCardDTO], dict[str, str]]:
         thematic_response = self._build_thematic_fallback_reply(query, analysis, places)
         if thematic_response is not None:
             return thematic_response
@@ -146,6 +146,7 @@ class GuideAssistant:
                 self._build_search_fallback_reply(analysis, places),
                 self._build_fallback_suggested_questions(analysis),
                 [],
+                {},
             )
 
         model_response = self._build_model_response_for_question(query, analysis)
@@ -154,17 +155,17 @@ class GuideAssistant:
 
         faq_reply = self._build_faq_reply(query)
         if faq_reply:
-            return faq_reply, self._build_fallback_suggested_questions(analysis), []
+            return faq_reply, self._build_fallback_suggested_questions(analysis), [], {}
 
         reply = self._build_domain_fallback_reply(analysis.detected_language)
-        return reply, self._build_fallback_suggested_questions(analysis), []
+        return reply, self._build_fallback_suggested_questions(analysis), [], {}
 
     def _build_model_response_for_places(
         self,
         query: str,
         analysis: QueryAnalysisDTO,
         places: list[PlaceDTO],
-    ) -> tuple[str | None, list[str], list[GuideCardDTO]] | None:
+    ) -> tuple[str | None, list[str], list[GuideCardDTO], dict[str, str]] | None:
         payload = {
             "mode": "search_results",
             "user_query": query,
@@ -174,18 +175,69 @@ class GuideAssistant:
                 {
                     "name": place.name,
                     "description": place.description,
+                    "address": place.address,
                     "types": place.types,
+                    "rating": place.rating
                 }
                 for place in places[:5]
             ],
         }
-        return self._complete_response(payload, analysis)
+        
+        # Generate dedicated descriptions for each place
+        places_descriptions = self._generate_place_descriptions(places[:5], analysis.detected_language)
+        
+        result = self._complete_response(payload, analysis)
+        if result is not None:
+            reply, questions, cards, _ = result
+            return reply, questions, cards, places_descriptions
+        
+        return None
+
+    def _generate_place_descriptions(self, places: list[PlaceDTO], language: str) -> dict[str, str]:
+        """Generate expert descriptions for each place using Gemini."""
+        descriptions: dict[str, str] = {}
+        
+        if self._gemini_client is None:
+            return descriptions
+        
+        for place in places:
+            try:
+                prompt = (
+                    f"Vous êtes un expert en tourisme et culture locale.\n"
+                    f"Décrivez ce lieu de manière captivante, d'expert local, en {language}.\n\n"
+                    f"Lieu: {place.name}\n"
+                    f"Adresse: {place.address}\n"
+                    f"Types: {', '.join(place.types)}\n"
+                    f"Note: {place.rating}/5" if place.rating else ""
+                    f"\n\nDescription actuelle Google Maps:\n{place.description}\n\n"
+                    f"Générez une description courte (15-25 mots) qui évoque l'atmosphère, l'expérience unique, "
+                    f"pourquoi ce lieu est spécial. Soyez vivant, captivant, pas générique."
+                )
+                
+                completion = self._gemini_client.chat.completions.create(
+                    model=settings.gemini_model,
+                    temperature=0.6,
+                    max_completion_tokens=100,
+                    messages=[
+                        {"role": "user", "content": prompt},
+                    ],
+                )
+                
+                description = completion.choices[0].message.content or ""
+                description = description.strip()
+                if description and len(description) > 5:
+                    descriptions[place.name] = description
+            except Exception:
+                # Fallback silently if generation fails
+                continue
+        
+        return descriptions
 
     def _build_model_response_for_question(
         self,
         query: str,
         analysis: QueryAnalysisDTO,
-    ) -> tuple[str | None, list[str], list[GuideCardDTO]] | None:
+    ) -> tuple[str | None, list[str], list[GuideCardDTO], dict[str, str]] | None:
         payload = {
             "mode": "general_question",
             "user_query": query,
@@ -197,7 +249,7 @@ class GuideAssistant:
         self,
         payload: dict[str, Any],
         analysis: QueryAnalysisDTO,
-    ) -> tuple[str | None, list[str], list[GuideCardDTO]] | None:
+    ) -> tuple[str | None, list[str], list[GuideCardDTO], dict[str, str]] | None:
         is_itinerary = payload.get("mode") == "itinerary_plan"
         clients: list[tuple[Any, str]] = []
 
@@ -210,8 +262,8 @@ class GuideAssistant:
         if not clients:
             return None
 
-        max_tokens = 900 if is_itinerary else 420
-        temperature = 0.55 if is_itinerary else 0.35
+        max_tokens = 1500 if is_itinerary else 1200
+        temperature = 0.55 if is_itinerary else 0.45
 
         for client, model_name in clients:
             try:
@@ -251,7 +303,12 @@ class GuideAssistant:
                 data.get("suggested_questions"),
                 analysis,
             )
-            return cleaned_reply, suggested_questions, []
+
+            places_descriptions = data.get("places_descriptions") or {}
+            if not isinstance(places_descriptions, dict):
+                places_descriptions = {}
+
+            return cleaned_reply, suggested_questions, [], places_descriptions
 
         return None
 
@@ -327,15 +384,17 @@ class GuideAssistant:
         query: str,
         analysis: QueryAnalysisDTO,
         places: list[PlaceDTO],
-    ) -> tuple[str | None, list[str], list[GuideCardDTO]] | None:
+    ) -> tuple[str | None, list[str], list[GuideCardDTO], dict[str, str]] | None:
         normalized_query = self._normalize_text(query)
         language = analysis.detected_language
 
         if self._looks_like_itinerary_request(normalized_query):
-            return self._build_itinerary_reply(language, analysis.city, places)
+            res = self._build_itinerary_reply(language, analysis.city, places)
+            return (*res, {})
 
         if self._looks_like_city_photo_request(normalized_query):
-            return self._build_city_photo_reply(language)
+            res = self._build_city_photo_reply(language)
+            return (*res, {})
 
         if places:
             return None
@@ -343,10 +402,12 @@ class GuideAssistant:
         if self._contains_any_term(normalized_query, _ROMANTIC_TERMS) and self._contains_any_term(
             normalized_query, _SUNSET_TERMS
         ):
-            return self._build_romantic_sunset_reply(language, analysis.city)
+            res = self._build_romantic_sunset_reply(language, analysis.city)
+            return (*res, {})
 
         if self._contains_any_term(normalized_query, _PHOTO_TERMS):
-            return self._build_photo_spot_reply(language, analysis.city)
+            res = self._build_photo_spot_reply(language, analysis.city)
+            return (*res, {})
 
         return None
 
@@ -358,7 +419,7 @@ class GuideAssistant:
         language: str,
         city: str | None,
         places: list[PlaceDTO],
-    ) -> tuple[str, list[str], list[GuideCardDTO]]:
+    ) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
         city_segment = f" a {city}" if city and language not in {"en"} else (f" in {city}" if city else "")
 
         if not places:
@@ -367,17 +428,20 @@ class GuideAssistant:
                     "I can build a simple itinerary, but I need a city or your location (near me).",
                     ["Plan a day in Marrakech", "Find places near me", "Romantic sunset spots near me"],
                     [],
+                    {},
                 )
             if language == "darija":
                 return (
                     "N9dar ndir lik programme, walakin khassni mdina wla position dyalk (qrib menni).",
                     ["Dir lia programme f Marrakech", "Qelleb qrib menni", "Blays romantique lghorob chams qrib menni"],
                     [],
+                    {},
                 )
             return (
                 "Je peux te faire un programme, mais il me faut une ville ou ta position (pres de moi).",
                 ["Fais-moi un programme a Marrakech", "Cherche pres de moi", "Sortie romantique pres de moi"],
                 [],
+                {},
             )
 
         selected = places[:5]
@@ -419,7 +483,7 @@ class GuideAssistant:
 
         model_response = self._build_model_response_for_itinerary(language, city, cards)
         if model_response is not None:
-            assistant_reply, suggested_questions, _ = model_response
+            assistant_reply, suggested_questions, _, _ = model_response
             return assistant_reply, suggested_questions, cards
 
         # Hardcoded immersive itineraries for specific cities/languages
@@ -454,7 +518,7 @@ class GuideAssistant:
                         "Fais un programme moins cher",
                         "Plan pour le coucher de soleil",
                     ]
-                return hardcoded_text, suggested_questions, cards
+                return hardcoded_text, suggested_questions, cards, {}
 
         # Fallback (no LLM available)
         reply = self._format_itinerary_fallback_reply(language, city_segment, cards)
@@ -465,7 +529,7 @@ class GuideAssistant:
         else:
             questions = ["Fais-le moins cher", "Remplace une etape par un musee", "Programme romantique pres de moi"]
 
-        return reply, questions, cards
+        return reply, questions, cards, {}
 
     def _format_itinerary_fallback_reply(
         self,
@@ -677,7 +741,7 @@ class GuideAssistant:
 
         return (50, 200)
 
-    def _build_city_photo_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO]]:
+    def _build_city_photo_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
         if language == "en":
             return (
                 "For a cultural and photogenic city in Morocco, Fez is great for heritage and crafts, "
@@ -689,6 +753,7 @@ class GuideAssistant:
                     "Find photo spots in Marrakech",
                 ],
                 self._build_city_photo_cards(language),
+                {},
             )
 
         if language == "darija":
@@ -702,6 +767,7 @@ class GuideAssistant:
                     "Qelleb lia spots photo f Marrakech",
                 ],
                 self._build_city_photo_cards(language),
+                {},
             )
 
         return (
@@ -714,13 +780,14 @@ class GuideAssistant:
                 "Trouve-moi des spots photo a Marrakech",
             ],
             self._build_city_photo_cards(language),
+            {},
         )
 
     def _build_romantic_sunset_reply(
         self,
         language: str,
         city: str | None,
-    ) -> tuple[str, list[str], list[GuideCardDTO]]:
+    ) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
         city_segment = f" a {city}" if city else ""
 
         if language == "en":
@@ -742,6 +809,7 @@ class GuideAssistant:
                     "Search near me",
                 ],
                 self._build_romantic_sunset_cards(language, city),
+                {},
             )
 
         if language == "darija":
@@ -763,6 +831,7 @@ class GuideAssistant:
                     "Qelleb qrib menni",
                 ],
                 self._build_romantic_sunset_cards(language, city),
+                {},
             )
 
         if city:
@@ -784,13 +853,14 @@ class GuideAssistant:
                 "Cherche pres de moi",
             ],
             self._build_romantic_sunset_cards(language, city),
+            {},
         )
 
     def _build_photo_spot_reply(
         self,
         language: str,
         city: str | None,
-    ) -> tuple[str, list[str], list[GuideCardDTO]]:
+    ) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
         city_segment = f" a {city}" if city else ""
 
         if language == "en":
@@ -812,6 +882,7 @@ class GuideAssistant:
                     "Find a photogenic place near me",
                 ],
                 self._build_photo_spot_cards(language, city),
+                {},
             )
 
         if language == "darija":
@@ -833,6 +904,7 @@ class GuideAssistant:
                     "Qelleb blasa photogenique qrib menni",
                 ],
                 self._build_photo_spot_cards(language, city),
+                {},
             )
 
         if city:
@@ -853,6 +925,7 @@ class GuideAssistant:
                 "Cherche un lieu photogenique pres de moi",
             ],
             self._build_photo_spot_cards(language, city),
+            {},
         )
 
     def _build_city_photo_cards(self, language: str) -> list[GuideCardDTO]:
