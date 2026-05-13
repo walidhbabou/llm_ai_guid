@@ -242,6 +242,9 @@ class GuideAssistant:
             "mode": "general_question",
             "user_query": query,
             "detected_language": analysis.detected_language,
+            "city": analysis.city,
+            "category": analysis.category,
+            "preferences": analysis.preferences or [],
         }
         return self._complete_response(payload, analysis)
 

@@ -122,7 +122,11 @@ def _build_description(place: dict, language: str) -> str | None:
     if isinstance(editorial, str):
         editorial = editorial.strip() or None
 
-    place_name = (place.get("name") or "").strip()
+    types = place.get("types") or []
+    price_level = place.get("price_level")
+    opening_hours = place.get("opening_hours")
+    open_now = opening_hours.get("open_now") if isinstance(opening_hours, dict) else None
+    label = _label_from_types(types, language)
 
     if language == "en":
         if editorial:
