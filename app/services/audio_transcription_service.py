@@ -25,10 +25,20 @@ _SUPPORTED_AUDIO_EXTENSIONS = {
 _LANGUAGE_ALIASES = {
     "ar": "ar",
     "ar-ma": "ar",
+    "ar-dz": "ar",
+    "darija": "ar",
+    "dz": "ar",
+    "ma": "ar",
     "en": "en",
     "en-us": "en",
+    "en-gb": "en",
     "fr": "fr",
     "fr-fr": "fr",
+    "fr-ma": "fr",
+    "es": "es",
+    "de": "de",
+    "it": "it",
+    "pt": "pt",
 }
 
 

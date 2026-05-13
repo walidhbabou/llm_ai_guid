@@ -257,7 +257,7 @@ class GoogleMapsClient:
         data = await self._get(self.PLACES_TEXT_URL, params=params)
         return data.get("results", [])[:limit]
 
-    def build_photo_url(self, photo_reference: str, max_width: int = 800) -> str:
+    def build_photo_url(self, photo_reference: str, max_width: int = 1200) -> str:
         return (
             "https://maps.googleapis.com/maps/api/place/photo"
             f"?maxwidth={max_width}&photo_reference={photo_reference}&key={settings.google_maps_api_key}"

@@ -1,4 +1,3 @@
-import json
 from typing import Any
 
 try:
@@ -37,7 +36,6 @@ class _GeminiCompletions:
         response_format: dict[str, Any] | None = None,
         messages: list[dict[str, Any]],
     ) -> _GeminiCompletion:
-        del model
         system_prompt = ""
         user_message = ""
         for message in messages:
@@ -47,6 +45,7 @@ class _GeminiCompletions:
                 user_message = str(message.get("content") or "")
 
         content = self._client.generate_text(
+            model=model,
             system_prompt=system_prompt,
             user_message=user_message,
             temperature=temperature,
@@ -69,12 +68,21 @@ class GroqCompatibleGemini:
             raise ValueError("GEMINI_API_KEY is not configured")
 
         genai.configure(api_key=settings.gemini_api_key.strip())
-        self._model = genai.GenerativeModel(settings.gemini_model)
+        self._model_name = settings.gemini_model
         self.chat = _GeminiChat(self)
+
+    def _get_model(self, system_prompt: str) -> Any:
+        if system_prompt:
+            return genai.GenerativeModel(
+                self._model_name,
+                system_instruction=system_prompt,
+            )
+        return genai.GenerativeModel(self._model_name)
 
     def generate_text(
         self,
         *,
+        model: str = "",
         system_prompt: str,
         user_message: str,
         temperature: float,
@@ -91,11 +99,13 @@ class GroqCompatibleGemini:
             generation_kwargs["response_mime_type"] = "application/json"
             prompt = (
                 f"{prompt}\n\n"
-                "Important: respond only with valid JSON. Do not add markdown, code fences, or extra text."
+                "IMPORTANT: reponds uniquement avec du JSON valide. "
+                "Pas de markdown, pas de backticks, pas de texte en dehors du JSON."
             )
 
-        response = self._model.generate_content(
-            [system_prompt, prompt],
+        gemini_model = self._get_model(system_prompt)
+        response = gemini_model.generate_content(
+            prompt,
             generation_config=genai.types.GenerationConfig(**generation_kwargs),
         )
 
