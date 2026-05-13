@@ -18,21 +18,109 @@ _OUT_OF_SCOPE_PATTERNS = (
 )
 _FAQ_REPLIES = (
     (r"\bcapitale\b.*\bmaroc\b", "La capitale du Maroc est Rabat."),
+    (r"\bmaroc\b.*\bcapitale\b", "La capitale du Maroc est Rabat."),
     (r"\bmonnaie\b.*\bmaroc\b", "La monnaie du Maroc est le dirham marocain (MAD)."),
+    (r"\bmaroc\b.*\bmonnaie\b", "La monnaie du Maroc est le dirham marocain (MAD)."),
     (
         r"\blangue\b.*\bmaroc\b",
         "Au Maroc, l'arabe et l'amazigh sont les langues officielles, et le francais est tres utilise.",
     ),
     (
+        r"\bmaroc\b.*\blangue\b",
+        "Au Maroc, l'arabe et l'amazigh sont les langues officielles, et le francais est tres utilise.",
+    ),
+    (
         r"\bmeilleure saison\b.*\bmaroc\b",
-        "Le printemps et l'automne sont souvent les saisons les plus agreables pour visiter le Maroc.",
+        "Le printemps (mars-mai) et l'automne (septembre-novembre) sont les meilleures saisons pour visiter le Maroc.",
+    ),
+    (
+        r"\bquand visiter\b.*\bmaroc\b",
+        "Le printemps (mars-mai) et l'automne (septembre-novembre) sont les meilleures saisons pour visiter le Maroc.",
+    ),
+    (
+        r"\bc est quoi\b.*\bhamm?am\b",
+        "Le hammam est un bain vapeur traditionnel marocain — a la fois rituel d'hygiene et moment social. On y suit une sequence: chaleur, kessa (gant exfoliant), savon beldi. Les hammams de quartier sont bien plus authentiques que les spas touristiques.",
+    ),
+    (
+        r"\bhamm?am\b.*\bc est quoi\b",
+        "Le hammam est un bain vapeur traditionnel marocain — a la fois rituel d'hygiene et moment social. On y suit une sequence: chaleur, kessa (gant exfoliant), savon beldi. Les hammams de quartier sont bien plus authentiques que les spas touristiques.",
+    ),
+    (
+        r"\bc est quoi\b.*\btajine\b",
+        "Le tajine est le plat national marocain — une cuisson lente dans un recipient en terre cuite en forme de cone, qui garde les saveurs et l'humidite. Agneau aux pruneaux, poulet au citron confit, legumes... chaque region a ses variantes.",
+    ),
+    (
+        r"\bc est quoi\b.*\bcouscous\b",
+        "Le couscous est le plat du vendredi au Maroc, plat de partage familial par excellence. De la semoule de ble dur, cuite a la vapeur, servie avec des legumes, de la viande et un bouillon parfume. La base de la cuisine berbere depuis des siecles.",
     ),
 )
-_CITY_TERMS = ("ville", "city", "destination")
-_CULTURE_TERMS = ("culture", "culturel", "culturelle", "historique", "patrimoine", "art")
-_PHOTO_TERMS = ("photo", "photos", "photogenique", "instagram", "instagrammable", "shooting")
+_CITY_TERMS = ("ville", "city", "destination", "region", "endroit")
+_CULTURE_TERMS = ("culture", "culturel", "culturelle", "historique", "patrimoine", "art", "artisanat", "tradition")
+_PHOTO_TERMS = ("photo", "photos", "photogenique", "instagram", "instagrammable", "shooting", "photographie")
 _ROMANTIC_TERMS = ("romantique", "romantic", "couple", "amour")
 _SUNSET_TERMS = ("coucher de soleil", "sunset", "golden hour")
+_FAMILY_TERMS = (
+    "famille",
+    "familial",
+    "familiale",
+    "family",
+    "enfants",
+    "enfant",
+    "kids",
+    "children",
+    "drari",
+    "wlad",
+    "sortie famille",
+    "sortie familiale",
+    "avec les enfants",
+    "avec mes enfants",
+    "avec ma famille",
+    "en famille",
+    "family trip",
+    "family day",
+)
+_BEST_SEASON_TERMS = (
+    "meilleure saison",
+    "best season",
+    "quelle saison",
+    "quand visiter",
+    "when to visit",
+    "quelle periode",
+    "quel mois",
+    "saison ideale",
+    "quand partir",
+    "best time",
+    "when to go",
+    "ramadan",
+)
+_BUDGET_TERMS = (
+    "combien ca coute",
+    "combien coute",
+    "prix moyen",
+    "budget voyage",
+    "voyage pas cher",
+    "voyager pas cher",
+    "how much does",
+    "is morocco cheap",
+    "cost of travel",
+    "travel budget",
+)
+_GASTRONOMY_TERMS = (
+    "gastronomie",
+    "cuisine marocaine",
+    "plat typique",
+    "specialite",
+    "quoi manger",
+    "que manger",
+    "what to eat",
+    "moroccan food",
+    "food in morocco",
+    "tajine",
+    "couscous",
+    "pastilla",
+    "harira",
+    "msemen",
+)
 _ITINERARY_TERMS = (
     "programme",
     "plan",
@@ -51,9 +139,16 @@ _ITINERARY_TERMS = (
     "que faire aujourd",
     "quoi faire aujourd",
     "siyaha",
-    "siyaha",
-    "siyaha",
     "blasa siyahia",
+    "avec les enfants",
+    "avec mes enfants",
+    "avec ma famille",
+    "sortie famille",
+    "sortie familiale",
+    "en famille",
+    "family trip",
+    "family day",
+    "weekend",
 )
 
 _DEFAULT_ITINERARY_SLOTS_FR = ("Matin", "Midi", "Après-midi", "Goûter", "Soir")
@@ -392,12 +487,19 @@ class GuideAssistant:
         language = analysis.detected_language
 
         if self._looks_like_itinerary_request(normalized_query):
-            res = self._build_itinerary_reply(language, analysis.city, places)
-            return (*res, {})
+            return self._build_itinerary_reply(language, analysis.city, places)
+
+        if self._looks_like_family_city_request(normalized_query):
+            return self._build_family_city_reply(language)
 
         if self._looks_like_city_photo_request(normalized_query):
-            res = self._build_city_photo_reply(language)
-            return (*res, {})
+            return self._build_city_photo_reply(language)
+
+        if self._looks_like_best_season_request(normalized_query):
+            return self._build_best_season_reply(language)
+
+        if self._looks_like_budget_request(normalized_query):
+            return self._build_budget_travel_reply(language)
 
         if places:
             return None
@@ -405,13 +507,35 @@ class GuideAssistant:
         if self._contains_any_term(normalized_query, _ROMANTIC_TERMS) and self._contains_any_term(
             normalized_query, _SUNSET_TERMS
         ):
-            res = self._build_romantic_sunset_reply(language, analysis.city)
-            return (*res, {})
+            return self._build_romantic_sunset_reply(language, analysis.city)
 
         if self._contains_any_term(normalized_query, _PHOTO_TERMS):
-            res = self._build_photo_spot_reply(language, analysis.city)
-            return (*res, {})
+            return self._build_photo_spot_reply(language, analysis.city)
 
+        if self._contains_any_term(normalized_query, _FAMILY_TERMS):
+            return self._build_family_outing_reply(language, analysis.city)
+
+        return None
+
+    def _looks_like_family_city_request(self, normalized_query: str) -> bool:
+        has_city_term = self._contains_any_term(normalized_query, _CITY_TERMS)
+        has_family_term = self._contains_any_term(normalized_query, _FAMILY_TERMS)
+        has_place_search = self._extract_category(normalized_query) is not None
+        if has_place_search:
+            return False
+        return has_city_term and has_family_term
+
+    def _looks_like_best_season_request(self, normalized_query: str) -> bool:
+        return self._contains_any_term(normalized_query, _BEST_SEASON_TERMS)
+
+    def _looks_like_budget_request(self, normalized_query: str) -> bool:
+        return self._contains_any_term(normalized_query, _BUDGET_TERMS)
+
+    def _extract_category(self, normalized_query: str) -> str | None:
+        from app.llm.analyzer import _CATEGORY_TERMS
+        for category, terms in _CATEGORY_TERMS.items():
+            if any(self._contains_term(normalized_query, t) for t in terms):
+                return category
         return None
 
     def _looks_like_itinerary_request(self, normalized_query: str) -> bool:
@@ -487,7 +611,7 @@ class GuideAssistant:
         model_response = self._build_model_response_for_itinerary(language, city, cards)
         if model_response is not None:
             assistant_reply, suggested_questions, _, _ = model_response
-            return assistant_reply, suggested_questions, cards
+            return assistant_reply, suggested_questions, cards, {}
 
         # Hardcoded immersive itineraries for specific cities/languages
         _HARDCODED: dict[tuple[str, str], str] = {
@@ -747,13 +871,20 @@ class GuideAssistant:
     def _build_city_photo_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
         if language == "en":
             return (
-                "For a cultural and photogenic city in Morocco, Fez is great for heritage and crafts, "
-                "Marrakech for colors and palaces, Chefchaouen for blue streets, and Essaouira for ocean views "
-                "and ramparts. Tell me your style and I will narrow it down.",
+                "Morocco has some of the most photogenic cities in the world — the choice depends on your style. "
+                "Fez is unmatched for heritage and detail photography: the medieval medina, the Chouara tanneries "
+                "seen from above in the morning light, the carved stucco of Bou Inania medersa. "
+                "Chefchaouen is a dream for color and calm compositions — blue-washed alleys, soft mountain light, "
+                "and intimate portraits of daily life. "
+                "Marrakech delivers rich ochre colors, dramatic architecture, and lively street scenes at Jemaa el-Fna. "
+                "Essaouira offers white ramparts against an Atlantic sky, fishing boats, and golden hour over the ocean. "
+                "Aït-Benhaddou is cinematic — a ksar fortress in the pre-Saharan desert that has starred in dozens of films. "
+                "Tangier is underrated: the old medina, the strait, and the mix of cultures create a unique visual story. "
+                "Tell me your style (architecture, portraits, landscapes, street life) and I will choose the perfect city.",
                 [
-                    "Which city is best for street photography?",
-                    "Which city is best for sunset photos?",
-                    "Find photo spots in Marrakech",
+                    "Best city for street photography in Morocco",
+                    "Find photo spots in Chefchaouen",
+                    "Sunrise spots in Fez medina",
                 ],
                 self._build_city_photo_cards(language),
                 {},
@@ -761,26 +892,38 @@ class GuideAssistant:
 
         if language == "darija":
             return (
-                "Ila bghiti mdina thaqafiya w photogenique f lmaghrib, Fes mzyana lmedina w sna3a, "
-                "Marrakech l alwan w l9sur, Chefchaouen lz9aq zar9in, w Essaouira lbaher w ssour. "
-                "Golli lia chno style li bghiti w n9tar7 3lik ahsan wa7da.",
+                "Lmaghrib fih mdun photogeniqin bzaf — lkhiyar kaysewwel 3la style dyalk. "
+                "Fes la misil fihà l heritage w tafasil: lmedina lqadima, tanneries Chouara mn fo9 f sbah, "
+                "w nqoush Bou Inania. Chefchaouen 7lma l alwan w calme: zz9aq zar9in, daw hani dial jibal, w portraits zwinin. "
+                "Marrakech 3ndhà alwan s7rawiya, 3mara jmila, w jaw Jemaa el-Fna. "
+                "Essaouira kaydir ssour lbyad m3a ssama l'atlantique, bwatim dial sayadin, w golden hour 3la lbaher. "
+                "Aït-Benhaddou cinématographique — ksar ssahra dial lfilam lkibra. "
+                "Tanger ma3rouf b7al ma khsso — lmedina l9adima, lmdiq, w mix dyal t9afat. "
+                "Golli lia style dyalk w n9tar7 lik l mdina li thyyem.",
                 [
-                    "Anahiya ahsan mdina l street photo?",
-                    "Anahiya ahsan mdina l sunset photos?",
-                    "Qelleb lia spots photo f Marrakech",
+                    "Ahsan mdina l street photo f lmaghrib",
+                    "Spots photo f Chefchaouen",
+                    "Mawdi sunrise f medina Fes",
                 ],
                 self._build_city_photo_cards(language),
                 {},
             )
 
         return (
-            "Pour une ville culturelle et photogenique au Maroc, Fes est excellente pour le patrimoine et "
-            "l'artisanat, Marrakech pour les couleurs et les palais, Chefchaouen pour les ruelles bleues, "
-            "et Essaouira pour l'ocean et les remparts. Dis-moi ton style et je te dirai laquelle choisir.",
+            "Le Maroc compte parmi les destinations les plus photogeniques du monde — le choix depend de votre style. "
+            "Fes est imbattable pour la photographie de patrimoine et de detail : la medina medievale, "
+            "les tanneries Chouara vues d'en haut le matin, les sculptures en stuc de la medersa Bou Inania. "
+            "Chefchaouen est un reve pour les compositions colorees et calmes — ruelles bleues, lumiere douce de montagne, "
+            "et portraits intimistes de la vie quotidienne. "
+            "Marrakech offre des ocres chauds, une architecture dramatique et les scenes de rue vivantes de Jemaa el-Fna. "
+            "Essaouira propose les remparts blancs sur le ciel atlantique, les bateaux de peche et la golden hour sur l'ocean. "
+            "Aït-Benhaddou est cinematographique — un ksar de pre-Sahara qui a servi de decor a des dizaines de films. "
+            "Tanger est sous-estimee : la vieille medina, le detroit de Gibraltar et le melange des cultures creent un recit visuel unique. "
+            "Dis-moi ton style (architecture, portrait, paysage, vie de rue) et je choisis la ville ideale.",
             [
-                "Quelle ville pour de la street photo ?",
-                "Quelle ville pour des photos au coucher du soleil ?",
-                "Trouve-moi des spots photo a Marrakech",
+                "Meilleure ville pour la street photo au Maroc ?",
+                "Trouve des spots photo a Chefchaouen",
+                "Spots pour le lever de soleil dans la medina de Fes",
             ],
             self._build_city_photo_cards(language),
             {},
@@ -931,76 +1074,321 @@ class GuideAssistant:
             {},
         )
 
+    def _build_family_city_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
+        if language == "en":
+            return (
+                "For a family trip in Morocco, the best cities depend on your children's age and what you enjoy together. "
+                "Agadir tops the list for young children: a 9-km protected beach, calm water, a waterpark (Oasiria), "
+                "and a family-friendly promenade. Marrakech is magical for all ages — the calèche rides around the medina, "
+                "the Majorelle and Menara gardens, and the spectacle of Jemaa el-Fna square. Rabat surprises with its zoo, "
+                "the Chellah gardens, and safe, uncrowded beaches at Plage de Rabat. Ifrane, in the Middle Atlas, is perfect "
+                "for nature lovers: cedar forests, monkeys, a turquoise lake, and ski slopes in winter. "
+                "Essaouira is ideal for older children who enjoy history and the ocean atmosphere. "
+                "Tell me the age range and I will narrow it down.",
+                [
+                    "Family activities in Marrakech",
+                    "Agadir family beach",
+                    "Where to take kids in Rabat",
+                ],
+                self._build_family_city_cards(language),
+                {},
+            )
+
+        if language == "darija":
+            return (
+                "Ila bghiti sortie familiale f lmaghrib, kol mdina 3ndha shi m3rof. "
+                "Agadir hiya l khiyar lol l drari sghir: plage 9 km mahmiiya, may hadi, parc aquatique Oasiria, "
+                "w corniche mzyana l familia. Marrakech katsahhel l kol sin: calèche f lmedina, jnane Majorelle w Ménara, "
+                "w jaw Jemaa el-Fna li kayshdd ndar l wlad. Rbat 3ndhom zoo mzyan, jnane Chellah, w plajet hadiya. "
+                "Ifrane f Atlas mzyana l tabi3a: ghaba d arz, qroud, buhira zarqa, w thalj f chta. "
+                "3tini 3omr drari w khassiyatek w nwrilik shi mzyan.",
+                [
+                    "Aktivitat familia f Marrakech",
+                    "Plage familia f Agadir",
+                    "Fin nmchi m3a drari f Rbat",
+                ],
+                self._build_family_city_cards(language),
+                {},
+            )
+
+        return (
+            "Pour une sortie familiale au Maroc, le choix de la ville depend de l'age des enfants et de vos envies. "
+            "Agadir est imbattable pour les jeunes enfants : plage securisee de 9 km, eaux calmes, parc aquatique Oasiria, "
+            "et promenade familiale tres agreable. Marrakech est magique pour tous les ages — les calèches dans la medina, "
+            "les jardins Majorelle et Menara, et le spectacle de la place Jemaa el-Fna captivent petits et grands. "
+            "Rabat surprend avec son zoo bien entretenu, les jardins de Chellah et des plages calmes. "
+            "Ifrane, dans le Moyen-Atlas, est parfaite pour la nature : forets de cedres, singes barbares, lac turquoise "
+            "et pistes de ski en hiver. Essaouira convient mieux aux enfants plus grands qui apprecient l'histoire et l'ocean. "
+            "Dis-moi l'age des enfants et le type d'activite souhaite, je te recommande la meilleure option.",
+            [
+                "Activites pour enfants a Marrakech",
+                "Plage familiale a Agadir",
+                "Que faire avec des enfants a Rabat",
+            ],
+            self._build_family_city_cards(language),
+            {},
+        )
+
+    def _build_family_outing_reply(
+        self,
+        language: str,
+        city: str | None,
+    ) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
+        city_segment = f" a {city}" if city and language == "fr" else (f" in {city}" if city and language == "en" else (f" f {city}" if city else ""))
+
+        if language == "en":
+            if city:
+                reply = (
+                    f"For a family outing{city_segment}, I would look for parks, gardens, beaches, "
+                    "child-friendly museums, and outdoor attractions. Share your location or let me search "
+                    "and I will pick the best spots."
+                )
+            else:
+                reply = (
+                    "For a family outing in Morocco, the best options are parks, calm beaches, zoos, gardens, "
+                    "and family-friendly attractions. Give me a city or your location and I will find specific spots."
+                )
+            return (
+                reply,
+                [
+                    f"Find family parks{' in ' + city if city else ' near me'}",
+                    f"Calm beaches for families{' in ' + city if city else ' in Agadir'}",
+                    "Family activities in Marrakech",
+                ],
+                self._build_family_outing_cards(language, city),
+                {},
+            )
+
+        if language == "darija":
+            if city:
+                reply = (
+                    f"Bash dir sortie familiale{city_segment}, qelleb 3la hdaye9, jnanat, plajet hadiya, "
+                    "mat7af l drari, w mawadi kharjiya mzyanin l familia. 3tini position dyalk w nqelleb lik."
+                )
+            else:
+                reply = (
+                    "L sortie familiale f lmaghrib, ahsan khiyarat hom hdaye9, plajet hadiya, zoo, jnanat, "
+                    "w mawadi familiya. 3tini smit lmdina wla position dyalk w nqelleb lik."
+                )
+            return (
+                reply,
+                [
+                    f"Qelleb hdaye9 familiya{' f ' + city if city else ' qrib menni'}",
+                    f"Plajet hadiya{' f ' + city if city else ' f Agadir'}",
+                    "Aktivitat familia f Marrakech",
+                ],
+                self._build_family_outing_cards(language, city),
+                {},
+            )
+
+        if city:
+            reply = (
+                f"Pour une sortie familiale{city_segment}, je viserais les parcs, jardins, plages calmes, "
+                "musees interactifs et attractions en plein air. Donne-moi ta position ou laisse-moi chercher "
+                "et je te selectionne les meilleurs endroits pour toute la famille."
+            )
+        else:
+            reply = (
+                "Pour une sortie familiale au Maroc, les meilleures options sont les parcs, les plages calmes, "
+                "les zoos, les jardins et les attractions en plein air. "
+                "Donne-moi une ville ou ta position et je trouve des endroits precis."
+            )
+        return (
+            reply,
+            [
+                f"Parcs familiaux{' a ' + city if city else ' pres de moi'}",
+                f"Plages calmes pour famille{' a ' + city if city else ' a Agadir'}",
+                "Activites familles a Marrakech",
+            ],
+            self._build_family_outing_cards(language, city),
+            {},
+        )
+
+    def _build_best_season_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
+        if language == "en":
+            return (
+                "Spring (March to May) and autumn (September to November) are the ideal seasons to visit Morocco. "
+                "Temperatures are pleasant across the country, landscapes are lush in spring, and the light is beautiful in autumn. "
+                "Summer (July-August) is very hot inland — Fez and Marrakech can reach 42-45°C — but the Atlantic coast "
+                "(Essaouira, Agadir) stays breezy and comfortable. Winter is mild on the coast but cold in the mountains, "
+                "with snow on the Toubkal and skiing at Ifrane. Ramadan is a unique cultural experience — the nighttime "
+                "atmosphere in medinas is exceptional — but some restaurants close during the day. "
+                "For the Sahara desert, November to March is perfect (warm days, cool nights). "
+                "For the mountains and hiking, June or September are ideal.",
+                [
+                    "Best city to visit in spring",
+                    "What to do in Morocco in summer",
+                    "Plan a desert trip in winter",
+                ],
+                [],
+                {},
+            )
+
+        if language == "darija":
+            return (
+                "Rbi3 (mars-mai) w khrib (septembre-novembre) homa ahsan wa9t bash tzur lmaghrib. "
+                "F rbi3, lhawa mzyan w tabiya khadra w daw jwab. F khrib, daba mzyan bzaf. "
+                "F sayf (yulyu-ghucht), Fes w Marrakech kaywslu 42-45 deraja — skhoun bzaf. "
+                "Walakin ssahil latlantiki (Essaouira, Agadir) barid w mri7. "
+                "F chta, ssahil dafi2 walakin ljibal barda w kayn talj 3la Toubkal, w ski f Ifrane. "
+                "Ramadan, jwa lil f lmdan exceptional walakin chi mat3am msakerin f nhar. "
+                "L ssahra, November-mars ahsan wa9t.",
+                [
+                    "Ashan mdina f rbi3",
+                    "Ash ndiru f lmaghrib f sayf",
+                    "Programme ssahra f chta",
+                ],
+                [],
+                {},
+            )
+
+        return (
+            "Le printemps (mars-mai) et l'automne (septembre-novembre) sont les meilleures periodes pour visiter le Maroc. "
+            "Les temperatures sont agreables partout, les paysages verdissent au printemps et les couleurs sont riches en automne. "
+            "L'ete (juillet-aout) est tres chaud dans les villes interieures — Fes et Marrakech peuvent atteindre 42-45°C — "
+            "mais la cote atlantique (Essaouira, Agadir) reste venteuse et confortable. "
+            "L'hiver est doux sur la cote mais froid en montagne, avec de la neige sur le Toubkal et du ski a Ifrane. "
+            "Le Ramadan est une experience culturelle unique — l'atmosphere nocturne dans les medinas est exceptionnelle — "
+            "mais certains restaurants ferment en journee. Pour le desert du Sahara, novembre a mars est ideal "
+            "(journees chaudes, nuits fraiches). Pour la montagne et la randonnee, juin ou septembre sont parfaits.",
+            [
+                "Quelle ville visiter au printemps ?",
+                "Que faire au Maroc en ete ?",
+                "Planifier un voyage dans le desert en hiver",
+            ],
+            [],
+            {},
+        )
+
+    def _build_budget_travel_reply(self, language: str) -> tuple[str, list[str], list[GuideCardDTO], dict[str, str]]:
+        if language == "en":
+            return (
+                "Morocco is one of the most affordable destinations in the Mediterranean and North Africa. "
+                "A local meal (sandwich, harira, brochettes) costs 20-60 MAD. A sit-down restaurant meal is 80-200 MAD. "
+                "Budget guesthouses (funduqs, small riads) start at 150-300 MAD per night. "
+                "Intercity buses (CTM/Supratours) are very affordable: Casablanca to Marrakech is around 90-120 MAD. "
+                "Trains are comfortable and not expensive. "
+                "Taxis within cities: always negotiate or insist on the meter. "
+                "The most budget-friendly cities: Fez and Meknes are less touristic than Marrakech, so prices are lower. "
+                "Avoid the medina tourist traps and eat where locals eat — the quality is often better.",
+                [
+                    "Cheap restaurants in Fez",
+                    "Budget riads in Marrakech",
+                    "How to get from Casablanca to Marrakech cheaply",
+                ],
+                [],
+                {},
+            )
+
+        if language == "darija":
+            return (
+                "Lmaghrib wa7d men arzas dyur f lmaditerranee. "
+                "Makla m7alliya (sandwich, harira, brochettes) kaykhlef 20-60 MAD. "
+                "Restaurant 3adi 80-200 MAD. Riad sghir wla funduq mn 150-300 MAD flila. "
+                "Bus intercite CTM/Supratours rkhisin: Casablanca l Marrakech 90-120 MAD. "
+                "Tren mri7 w la ghali. Petit taxi: dima 3awed 3la 3addad wla tfawet thaman qbel. "
+                "Ashan mdun budget: Fes w Meknes akhal l siya7a mn Marrakech = taman rkhis. "
+                "Kul fin kayaklu nas lmaghribin — juda ghir a7san.",
+                [
+                    "Mat3am rkhis f Fes",
+                    "Riad rkhis f Marrakech",
+                    "Kif nmchi mn Casablanca l Marrakech b taman rkhis",
+                ],
+                [],
+                {},
+            )
+
+        return (
+            "Le Maroc est l'une des destinations les plus accessibles du bassin mediterraneen. "
+            "Un repas local (sandwich, harira, brochettes) coute 20-60 MAD. Un restaurant assis 80-200 MAD. "
+            "Les petits gites et funduqs commencent a 150-300 MAD la nuit. "
+            "Les bus intercites CTM/Supratours sont tres abordables : Casablanca-Marrakech tourne autour de 90-120 MAD. "
+            "Le train est confortable et raisonnable. "
+            "Les petits taxis en ville : insiste toujours sur le compteur ou negocie avant de monter. "
+            "Les villes les plus economiques : Fes et Meknes, moins touristiques que Marrakech, ont des prix plus bas. "
+            "Mange la ou mangent les locaux — c'est souvent moins cher et bien meilleur.",
+            [
+                "Restaurants pas chers a Fes",
+                "Riads abordables a Marrakech",
+                "Comment aller de Casablanca a Marrakech pas cher",
+            ],
+            [],
+            {},
+        )
+
+    def _build_family_city_cards(self, language: str) -> list[GuideCardDTO]:
+        if language == "en":
+            return [
+                self._card("Agadir", "9-km protected beach, calm water, waterpark Oasiria — top pick for young children.", "family activities in Agadir"),
+                self._card("Marrakech", "Calèche rides, Majorelle garden, Jemaa el-Fna spectacle — magical for all ages.", "family activities in Marrakech"),
+                self._card("Rabat", "Well-maintained zoo, Chellah gardens, calm beaches — perfect for families on a budget.", "family activities in Rabat"),
+                self._card("Ifrane", "Cedar forest, monkeys, turquoise lake, ski slopes — ideal for nature-loving families.", "family activities in Ifrane"),
+            ]
+        if language == "darija":
+            return [
+                self._card("Agadir", "Plage 9 km mahmiiya, may hadi, Oasiria — ahsan khiyar l drari sghir.", "aktivitat familia f Agadir"),
+                self._card("Marrakech", "Calèche, jnane Majorelle, Jemaa el-Fna — mzyan l kol sin.", "aktivitat familia f Marrakech"),
+                self._card("Rbat", "Zoo mzyan, jnane Chellah, plajet hadiya — mzyan l familia b budget.", "aktivitat familia f Rbat"),
+                self._card("Ifrane", "Ghaba d arz, qroud, buhira zarqa, thalj — mzyan l wlad li kay7bu tabi3a.", "aktivitat familia f Ifrane"),
+            ]
+        return [
+            self._card("Agadir", "Plage securisee de 9 km, eaux calmes, parc aquatique Oasiria — idéal pour les jeunes enfants.", "activites famille a Agadir"),
+            self._card("Marrakech", "Calèches, jardin Majorelle, place Jemaa el-Fna — magique pour tous les ages.", "activites famille a Marrakech"),
+            self._card("Rabat", "Zoo bien entretenu, jardins de Chellah, plages calmes — parfait pour les families avec budget.", "activites famille a Rabat"),
+            self._card("Ifrane", "Foret de cedres, singes barbares, lac turquoise, ski — ideal pour les families qui aiment la nature.", "activites famille a Ifrane"),
+        ]
+
+    def _build_family_outing_cards(self, language: str, city: str | None) -> list[GuideCardDTO]:
+        default_city = city or "Marrakech"
+        if language == "en":
+            return [
+                self._card("Park / Garden", "Open-air space, shade and greenery for children to run and play freely.", f"family park in {default_city}"),
+                self._card("Calm beach", "Safe, shallow water ideal for young children and relaxed family swimming.", f"calm beach for families in {default_city}"),
+                self._card("Museum", "Interactive exhibits and cultural immersion — great for curious older children.", f"family museum in {default_city}"),
+                self._card("Outdoor attraction", "Zoo, botanical garden or nature trail — keeps kids engaged for hours.", f"outdoor attraction in {default_city}"),
+            ]
+        if language == "darija":
+            return [
+                self._card("Hdiya / Jnina", "Mkan mftuh, dhal w khadriya bach drari yel3bu.", f"hdiya familia f {default_city}"),
+                self._card("Plage hadya", "May hadi w 9sirr — mzyan l drari sghir w sebha familia.", f"plage hadya familia f {default_city}"),
+                self._card("Mat7af", "3arad interactif w thaqafa — mzyan l wlad li 3ndhom fiha.", f"mat7af familia f {default_city}"),
+                self._card("Mawdi kharji", "Zoo, jnane botanika wla sentier tabi3i — kaybqa drari mnhmakin sa3at.", f"mawdi kharji f {default_city}"),
+            ]
+        return [
+            self._card("Parc / Jardin", "Espace ouvert, ombre et verdure pour que les enfants puissent courir et jouer librement.", f"parc familial a {default_city}"),
+            self._card("Plage calme", "Eaux peu profondes et securisees — ideal pour les jeunes enfants et la baignade en famille.", f"plage calme famille a {default_city}"),
+            self._card("Musee", "Expositions interactives et immersion culturelle — excellent pour les enfants plus grands et curieux.", f"musee famille a {default_city}"),
+            self._card("Attraction en plein air", "Zoo, jardin botanique ou sentier nature — tient les enfants occupes des heures.", f"attraction plein air a {default_city}"),
+        ]
+
     def _build_city_photo_cards(self, language: str) -> list[GuideCardDTO]:
         if language == "en":
             return [
-                self._card(
-                    "Fez",
-                    "Best for heritage, craft details, old medina alleys, and textured street photography.",
-                    "photo spots in Fez",
-                ),
-                self._card(
-                    "Marrakech",
-                    "Strong colors, palaces, gardens, and lively scenes for architecture and portraits.",
-                    "photo spots in Marrakech",
-                ),
-                self._card(
-                    "Chefchaouen",
-                    "Blue streets and soft light for calm urban photos and visual storytelling.",
-                    "photo spots in Chefchaouen",
-                ),
-                self._card(
-                    "Essaouira",
-                    "Ramparts, ocean, port, and golden hour make it great for coastal photography.",
-                    "photo spots in Essaouira",
-                ),
+                self._card("Fez", "Medieval medina, Chouara tanneries at dawn, sculpted stucco — unmatched for heritage detail photography.", "photo spots in Fez"),
+                self._card("Chefchaouen", "Blue-washed alleys, soft mountain light, calm compositions and intimate portraits.", "photo spots in Chefchaouen"),
+                self._card("Marrakech", "Warm ochre tones, ornate palaces, souks, and the electric spectacle of Jemaa el-Fna at dusk.", "photo spots in Marrakech"),
+                self._card("Essaouira", "White ramparts against Atlantic sky, fishing port, and cinematic golden-hour light.", "photo spots in Essaouira"),
+                self._card("Aït-Benhaddou", "Pre-Saharan ksar fortress, desert light, and a dramatic cinematic landscape.", "photo spots in Ait Benhaddou"),
+                self._card("Tangier", "Old medina, Gibraltar strait views, and a unique blend of African and European cultures.", "photo spots in Tangier"),
             ]
 
         if language == "darija":
             return [
-                self._card(
-                    "Fes",
-                    "Mzyana l patrimoine, sna3a, zz9aq dial lmedina, w street photo b details zwinin.",
-                    "spots photo f Fes",
-                ),
-                self._card(
-                    "Marrakech",
-                    "Alwan qwiya, l9sur, jnanat, w jaw hay bash tsawer architecture w portraits.",
-                    "spots photo f Marrakech",
-                ),
-                self._card(
-                    "Chefchaouen",
-                    "Z9aq zar9in w daw hani, mzyana l tsawer hadi2a w storytelling.",
-                    "spots photo f Chefchaouen",
-                ),
-                self._card(
-                    "Essaouira",
-                    "Ssour, lbaher, l port, w golden hour kay3tiw tsawer zwinin bzaf.",
-                    "spots photo f Essaouira",
-                ),
+                self._card("Fes", "Medina qadima, tanneries Chouara f sbah, nqoush Bou Inania — la misil l heritage photo.", "spots photo f Fes"),
+                self._card("Chefchaouen", "Z9aq zar9in, daw hani dial jibal, tsawer calma w portraits zwinin.", "spots photo f Chefchaouen"),
+                self._card("Marrakech", "Alwan s7rawiya, 9sur kbira, aswaq, w jaw Jemaa el-Fna f 3chiya.", "spots photo f Marrakech"),
+                self._card("Essaouira", "Ssour lyad m3a ssama latlantique, minaء sayadin, w golden hour 3la lbaher.", "spots photo f Essaouira"),
+                self._card("Aït-Benhaddou", "Ksar ssahra, daw dyal sahara, w manzar cinématographique 3ali.", "spots photo f Ait Benhaddou"),
+                self._card("Tanger", "Medina l9adima, manzar 3la lmdiq, w mix tbayyin dyal t9afat.", "spots photo f Tanger"),
             ]
 
         return [
-            self._card(
-                "Fes",
-                "Ideale pour le patrimoine, l'artisanat, les ruelles de la medina et la street photo pleine de details.",
-                "spots photo a Fes",
-            ),
-            self._card(
-                "Marrakech",
-                "Parfaite pour les couleurs, les palais, les jardins et les scenes vivantes d'architecture ou de portrait.",
-                "spots photo a Marrakech",
-            ),
-            self._card(
-                "Chefchaouen",
-                "Tres bonne option pour les ruelles bleues, la lumiere douce et une ambiance photo plus calme.",
-                "spots photo a Chefchaouen",
-            ),
-            self._card(
-                "Essaouira",
-                "Excellente pour les remparts, l'ocean, le port et les photos au coucher du soleil.",
-                "spots photo a Essaouira",
-            ),
+            self._card("Fes", "Medina medievale, tanneries Chouara a l'aube, stuc sculpte — imbattable pour le patrimoine et le detail.", "spots photo a Fes"),
+            self._card("Chefchaouen", "Ruelles bleues, lumiere douce de montagne, compositions calmes et portraits intimistes.", "spots photo a Chefchaouen"),
+            self._card("Marrakech", "Ocres chauds, palais ornes, souks et le spectacle electrique de Jemaa el-Fna au crepuscule.", "spots photo a Marrakech"),
+            self._card("Essaouira", "Remparts blancs sur ciel atlantique, port de peche et lumiere cinematographique de golden hour.", "spots photo a Essaouira"),
+            self._card("Aït-Benhaddou", "Ksar de pre-Sahara, lumiere desert et paysage dramatique tres cinematographique.", "spots photo a Ait Benhaddou"),
+            self._card("Tanger", "Vieille medina, vue sur le detroit de Gibraltar et melange unique de cultures africaine et europeenne.", "spots photo a Tanger"),
         ]
 
     def _build_romantic_sunset_cards(

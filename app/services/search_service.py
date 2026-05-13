@@ -139,7 +139,7 @@ class AISearchService:
         user_latitude: float | None,
         user_longitude: float | None,
     ) -> list[dict]:
-        # Goal: get a mix of "visit + eat + coffee + sunset" for a day plan.
+        # Goal: get a mix of "visit + eat + coffee + sunset/kids" for a day plan.
         # Keep queries short and high-signal for Google.
         queries: list[str] = []
 
@@ -149,9 +149,13 @@ class AISearchService:
         if "culture" in prefs or "historique" in prefs:
             queries.extend(["tourist attraction", "museum", "historic site"])
         if "photos" in prefs:
-            queries.extend(["photo spot", "viewpoint"])
+            queries.extend(["photo spot", "viewpoint", "panoramic viewpoint"])
         if "coucher de soleil" in prefs:
             queries.extend(["sunset viewpoint", "sunset beach"])
+        if "familial" in prefs or "enfants" in prefs:
+            queries.extend(["parc pour enfants", "zoo", "jardin familial", "attraction famille"])
+        if "balade" in prefs or "sport" in prefs:
+            queries.extend(["parc nature", "randonnee", "corniche"])
 
         # Default mix
         if not queries:
@@ -164,7 +168,7 @@ class AISearchService:
 
         # Each query returns a few results; merge/dedupe until we reach limit.
         per_query_limit = max(3, min(6, int(analysis.result_limit)))
-        for q in queries[:6]:
+        for q in queries[:8]:
             results = await google_maps.search_places(
                 raw_query=q,
                 category=None,
@@ -188,19 +192,28 @@ class AISearchService:
         return merged[: int(analysis.result_limit)]
 
     def _looks_like_itinerary_query(self, query: str) -> bool:
-        normalized = " ".join(query.lower().replace("’", "'").split())
+        normalized = " ".join(query.lower().replace("’", "’").split())
         keywords = (
             "programme",
             "itineraire",
             "itinéraire",
             "aujourd",
-            "aujourd'hui",
+            "aujourd’hui",
             "today",
             "day trip",
             "avec ma femme",
             "ma femme",
             "siyaha",
             "sortie",
+            "avec les enfants",
+            "avec mes enfants",
+            "avec ma famille",
+            "sortie famille",
+            "sortie familiale",
+            "en famille",
+            "family trip",
+            "family day",
+            "weekend",
         )
         return any(k in normalized for k in keywords)
 
@@ -209,12 +222,16 @@ class AISearchService:
         prefs = set((analysis.preferences or [])[:4])
         if "romantique" in prefs:
             return "sortie romantique"
+        if "familial" in prefs or "enfants" in prefs:
+            return "activites famille parc jardin"
         if "culture" in prefs or "historique" in prefs:
             return "lieux touristiques culturels"
         if "photos" in prefs:
-            return "spots photo"
+            return "spots photo viewpoint"
         if "coucher de soleil" in prefs:
             return "coucher de soleil point de vue"
+        if "balade" in prefs or "sport" in prefs:
+            return "parc nature randonnee corniche"
         return "lieux touristiques"
 
     async def search_from_audio(

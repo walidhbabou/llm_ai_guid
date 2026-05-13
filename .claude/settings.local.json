@@ -1,0 +1,15 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(Get-ChildItem -Path \"D:\\\\front\\\\mobile-app\\\\llm_map\" -Recurse -Force)",
+      "Bash(Select-Object FullName)",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/llm/system_prompt.py'\\).read\\(\\)\\); print\\('system_prompt.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/llm/analyzer.py'\\).read\\(\\)\\); print\\('analyzer.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/llm/assistant.py'\\).read\\(\\)\\); print\\('assistant.py OK'\\)\")",
+      "Bash(python -c \"import ast; ast.parse\\(open\\('app/services/search_service.py'\\).read\\(\\)\\); print\\('search_service.py OK'\\)\")",
+      "Bash(python -c ' *)",
+      "Bash(python -c \"import sys; print\\(sys.stdin.read\\(\\)\\)\")",
+      "Bash(python *)"
+    ]
+  }
+}
